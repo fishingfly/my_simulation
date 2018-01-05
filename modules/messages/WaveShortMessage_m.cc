@@ -77,6 +77,7 @@ WaveShortMessage::WaveShortMessage(const char *name, int kind) : ::cPacket(name,
     this->departure_var = 0;
     this->CHId_var = 0;
     this->CH_Speed_var = 0;
+    this->gatewayNode_var = 0;
 }
 
 WaveShortMessage::WaveShortMessage(const WaveShortMessage& other) : ::cPacket(other)
@@ -124,6 +125,9 @@ void WaveShortMessage::copy(const WaveShortMessage& other)
     this->departure_var = other.departure_var;
     this->CHId_var = other.CHId_var;
     this->CH_Speed_var = other.CH_Speed_var;
+    this->gatewayNode_var = other.gatewayNode_var;
+    this->infoGw_var = other.infoGw_var;
+    this->infoGWToLte_var = other.infoGWToLte_var;
 }
 
 void WaveShortMessage::parsimPack(cCommBuffer *b)
@@ -155,6 +159,9 @@ void WaveShortMessage::parsimPack(cCommBuffer *b)
     doPacking(b,this->departure_var);
     doPacking(b,this->CHId_var);
     doPacking(b,this->CH_Speed_var);
+    doPacking(b,this->gatewayNode_var);
+    doPacking(b,this->infoGw_var);
+    doPacking(b,this->infoGWToLte_var);
 }
 
 void WaveShortMessage::parsimUnpack(cCommBuffer *b)
@@ -186,6 +193,9 @@ void WaveShortMessage::parsimUnpack(cCommBuffer *b)
     doUnpacking(b,this->departure_var);
     doUnpacking(b,this->CHId_var);
     doUnpacking(b,this->CH_Speed_var);
+    doUnpacking(b,this->gatewayNode_var);
+    doUnpacking(b,this->infoGw_var);
+    doUnpacking(b,this->infoGWToLte_var);
 }
 
 int WaveShortMessage::getWsmVersion() const
@@ -448,6 +458,36 @@ void WaveShortMessage::setCH_Speed(int CH_Speed)
     this->CH_Speed_var = CH_Speed;
 }
 
+bool WaveShortMessage::getGatewayNode() const
+{
+    return gatewayNode_var;
+}
+
+void WaveShortMessage::setGatewayNode(bool gatewayNode)
+{
+    this->gatewayNode_var = gatewayNode;
+}
+
+InfoGW& WaveShortMessage::getInfoGw()
+{
+    return infoGw_var;
+}
+
+void WaveShortMessage::setInfoGw(const InfoGW& infoGw)
+{
+    this->infoGw_var = infoGw;
+}
+
+InfoGWToLte& WaveShortMessage::getInfoGWToLte()
+{
+    return infoGWToLte_var;
+}
+
+void WaveShortMessage::setInfoGWToLte(const InfoGWToLte& infoGWToLte)
+{
+    this->infoGWToLte_var = infoGWToLte;
+}
+
 class WaveShortMessageDescriptor : public cClassDescriptor
 {
   public:
@@ -495,7 +535,7 @@ const char *WaveShortMessageDescriptor::getProperty(const char *propertyname) co
 int WaveShortMessageDescriptor::getFieldCount(void *object) const
 {
     cClassDescriptor *basedesc = getBaseClassDescriptor();
-    return basedesc ? 26+basedesc->getFieldCount(object) : 26;
+    return basedesc ? 29+basedesc->getFieldCount(object) : 29;
 }
 
 unsigned int WaveShortMessageDescriptor::getFieldTypeFlags(void *object, int field) const
@@ -533,8 +573,11 @@ unsigned int WaveShortMessageDescriptor::getFieldTypeFlags(void *object, int fie
         FD_ISEDITABLE,
         FD_ISEDITABLE,
         FD_ISEDITABLE,
+        FD_ISEDITABLE,
+        FD_ISCOMPOUND,
+        FD_ISCOMPOUND,
     };
-    return (field>=0 && field<26) ? fieldTypeFlags[field] : 0;
+    return (field>=0 && field<29) ? fieldTypeFlags[field] : 0;
 }
 
 const char *WaveShortMessageDescriptor::getFieldName(void *object, int field) const
@@ -572,8 +615,11 @@ const char *WaveShortMessageDescriptor::getFieldName(void *object, int field) co
         "departure",
         "CHId",
         "CH_Speed",
+        "gatewayNode",
+        "infoGw",
+        "infoGWToLte",
     };
-    return (field>=0 && field<26) ? fieldNames[field] : NULL;
+    return (field>=0 && field<29) ? fieldNames[field] : NULL;
 }
 
 int WaveShortMessageDescriptor::findField(void *object, const char *fieldName) const
@@ -606,6 +652,9 @@ int WaveShortMessageDescriptor::findField(void *object, const char *fieldName) c
     if (fieldName[0]=='d' && strcmp(fieldName, "departure")==0) return base+23;
     if (fieldName[0]=='C' && strcmp(fieldName, "CHId")==0) return base+24;
     if (fieldName[0]=='C' && strcmp(fieldName, "CH_Speed")==0) return base+25;
+    if (fieldName[0]=='g' && strcmp(fieldName, "gatewayNode")==0) return base+26;
+    if (fieldName[0]=='i' && strcmp(fieldName, "infoGw")==0) return base+27;
+    if (fieldName[0]=='i' && strcmp(fieldName, "infoGWToLte")==0) return base+28;
     return basedesc ? basedesc->findField(object, fieldName) : -1;
 }
 
@@ -644,8 +693,11 @@ const char *WaveShortMessageDescriptor::getFieldTypeString(void *object, int fie
         "bool",
         "string",
         "int",
+        "bool",
+        "InfoGW",
+        "InfoGWToLte",
     };
-    return (field>=0 && field<26) ? fieldTypeStrings[field] : NULL;
+    return (field>=0 && field<29) ? fieldTypeStrings[field] : NULL;
 }
 
 const char *WaveShortMessageDescriptor::getFieldProperty(void *object, int field, const char *propertyname) const
@@ -711,6 +763,9 @@ std::string WaveShortMessageDescriptor::getFieldAsString(void *object, int field
         case 23: return bool2string(pp->getDeparture());
         case 24: return oppstring2string(pp->getCHId());
         case 25: return long2string(pp->getCH_Speed());
+        case 26: return bool2string(pp->getGatewayNode());
+        case 27: {std::stringstream out; out << pp->getInfoGw(); return out.str();}
+        case 28: {std::stringstream out; out << pp->getInfoGWToLte(); return out.str();}
         default: return "";
     }
 }
@@ -745,6 +800,7 @@ bool WaveShortMessageDescriptor::setFieldAsString(void *object, int field, int i
         case 23: pp->setDeparture(string2bool(value)); return true;
         case 24: pp->setCHId((value)); return true;
         case 25: pp->setCH_Speed(string2long(value)); return true;
+        case 26: pp->setGatewayNode(string2bool(value)); return true;
         default: return false;
     }
 }
@@ -764,6 +820,8 @@ const char *WaveShortMessageDescriptor::getFieldStructName(void *object, int fie
         case 20: return opp_typename(typeid(infoDSRC));
         case 21: return opp_typename(typeid(clusterQueue));
         case 22: return opp_typename(typeid(clusterQueue));
+        case 27: return opp_typename(typeid(InfoGW));
+        case 28: return opp_typename(typeid(InfoGWToLte));
         default: return NULL;
     };
 }
@@ -784,6 +842,8 @@ void *WaveShortMessageDescriptor::getFieldStructPointer(void *object, int field,
         case 20: return (void *)(&pp->getTempCHInfo()); break;
         case 21: return (void *)(&pp->getTempCHRoadID()); break;
         case 22: return (void *)(&pp->getCHRoadID()); break;
+        case 27: return (void *)(&pp->getInfoGw()); break;
+        case 28: return (void *)(&pp->getInfoGWToLte()); break;
         default: return NULL;
     }
 }

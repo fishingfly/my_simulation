@@ -51,7 +51,7 @@ void SimpleServerApp::handleMessageWhenUp(cMessage *msg){
 		std::cerr<<"LLLLL"<<std::endl;
 	    receivedMessages++;
 		tempCHMsgToDB(receiveMessage);//UPdate lte DB
-		if(receiveMessage->getMsgState()==2)
+		if(receiveMessage->getMsgState() == 2)
 		{
 	        std::string sourceAddress=gatherFromDB();
 	        if(sourceAddress!="")
@@ -65,6 +65,9 @@ void SimpleServerApp::handleMessageWhenUp(cMessage *msg){
 	            std::cerr << "[LTE_Server_App, " << simTime() << "] Sending Message back to " << address << std::endl;
 	            socket.sendTo(reply, address, 4242);
 	        }
+		} else if (receiveMessage->getMsgState() == 4) {
+		    //process routing message
+
 		}
 	}
 	delete msg;

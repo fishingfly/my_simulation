@@ -72,10 +72,20 @@ protected:
 	int CMcount;
 	int sameForTempUpdate;
 	int sameForUpdate;
+	double meanSpeed;
+	int clusterSize;
+	bool hasFindGw;
 	std::map<std::string,Info> vehicleInfo;
 	std::map<std::string,Info> vehicleInfoCH;
 	std::queue<std::string> clusterQueue;
 	std::queue<std::string> tempClusterQueue;
+
+
+	InfoGW infoGw;
+	InfoGWToLte infoGwToLte;
+	std::map<std::string, Coord> electricMap;
+	std::map<std::string,Info> GwForCluster;
+
 	//record DATA
 	int overHead_clustering;
 	std::map<std::string,CH_Rocord> CH_Info;
@@ -83,6 +93,7 @@ protected:
 	std::set<int> carState;
 	int broadcastNum;
 	int unicastNum;
+	bool gatewayNode;
 
 
 protected:
@@ -96,6 +107,7 @@ protected:
     std::string getCurrentJunctionId(std::string roadId);
     std::string getNextRoadId(std::list<std::string> route,std::string roadId);
     std::list<std::string> getCurrentRoute();
+
     std::string getSumoId();
 	void addInitialcount();
 	int getInitialcount();
@@ -113,9 +125,11 @@ protected:
 	void startBroadcastDismiss(int msgState,std::string connectCHId);
 	void sendToLTE(int msgState);
 	void startUnicast(HeterogeneousMessage *receiveMessage,int msgState);
+	void startUnicastByGateWay(HeterogeneousMessage *receiveMessage,int msgState);
 	void startUnicastDeparture(LAddress::L2Type macAddr,int msgState,std::string Id_CH);
 	void setVehicleState(int value);
 	int getVehicleState();
+	void findTwoGW(std::map<std::string,Info> tempInfo);
 
 	void pushVehicleInfo(std::string carId,Info carInfo);
 	std::map<std::string,Info> getVehicleInfoofTempCluster();
@@ -140,7 +154,16 @@ protected:
 	int getSpeed();
 
 	void recordMacAddr_CH(LAddress::L2Type temp);
+
 	LAddress::L2Type getMacAddr_CH();
+
+    bool isgatewayNode();
+    void setGateWayNode(bool temp);
+    void setInfoGw(InfoGW temp);
+    InfoGW getInfoGw();
+    void setInfoGwToLte(InfoGWToLte temp);
+    InfoGWToLte getInfoGwToLte();
+
 	//record date
 	void insertCH_Id(std::string carId);
 	std::set<std::string> getCH_Id(std::string carId);

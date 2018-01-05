@@ -34,13 +34,21 @@ struct Info
     std::string currentRoadId;
     std::string junctionId;
     Coord pos;
+    LAddress::L2Type macAddrGW;
 };
 
-typedef std::map<std::string,Info> infoDSRC;
+struct Connectivity_Info {
+	double connectivityValue;
+	LAddress::L2Type macAddrGW;
+};
+
+typedef std::map<std::string, Info> infoDSRC;
+typedef std::map<std::string, std::map<std::string, Connectivity_Info>> InfoGW;
+typedef std::map<std::string, std::map<std::string, std::map<std::string, Connectivity_Info>>> InfoGWToLte;
 // }}
 
 /**
- * Class generated from <tt>veins/modules/messages/WaveShortMessage.msg:56</tt> by nedtool.
+ * Class generated from <tt>veins/modules/messages/WaveShortMessage.msg:65</tt> by nedtool.
  * <pre>
  * packet WaveShortMessage
  * {
@@ -81,6 +89,9 @@ typedef std::map<std::string,Info> infoDSRC;
  *     bool departure;
  *     string CHId;
  *     int CH_Speed;
+ *     bool gatewayNode;
+ *     InfoGW infoGw;
+ *     InfoGWToLte infoGWToLte;
  * }
  * </pre>
  */
@@ -113,6 +124,9 @@ class WaveShortMessage : public ::cPacket
     bool departure_var;
     opp_string CHId_var;
     int CH_Speed_var;
+    bool gatewayNode_var;
+    InfoGW infoGw_var;
+    InfoGWToLte infoGWToLte_var;
 
   private:
     void copy(const WaveShortMessage& other);
@@ -189,6 +203,14 @@ class WaveShortMessage : public ::cPacket
     virtual void setCHId(const char * CHId);
     virtual int getCH_Speed() const;
     virtual void setCH_Speed(int CH_Speed);
+    virtual bool getGatewayNode() const;
+    virtual void setGatewayNode(bool gatewayNode);
+    virtual InfoGW& getInfoGw();
+    virtual const InfoGW& getInfoGw() const {return const_cast<WaveShortMessage*>(this)->getInfoGw();}
+    virtual void setInfoGw(const InfoGW& infoGw);
+    virtual InfoGWToLte& getInfoGWToLte();
+    virtual const InfoGWToLte& getInfoGWToLte() const {return const_cast<WaveShortMessage*>(this)->getInfoGWToLte();}
+    virtual void setInfoGWToLte(const InfoGWToLte& infoGWToLte);
 };
 
 inline void doPacking(cCommBuffer *b, WaveShortMessage& obj) {obj.parsimPack(b);}

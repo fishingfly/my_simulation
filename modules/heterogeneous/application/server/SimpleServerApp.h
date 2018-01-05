@@ -73,6 +73,7 @@ class SimpleServerApp: public ApplicationBase {
 		std::map<std::string,Info> lteDB;
 		RequestRecord reqRecord;
 		std::string maxNextRoadId;
+	    InfoGWToLte infoGWToLte_var;
 
 
 	public:

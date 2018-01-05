@@ -44,14 +44,23 @@ struct Info
     Coord pos;
 };
 
-typedef std::map<std::string,Info> infoDSRC;
+struct Connectivity_Info {
+	double connectivityValue;
+	LAddress::L2Type macAddrGW;
+};
 
+typedef std::map<std::string, Info> infoDSRC;
+typedef std::map<std::string, std::map<std::string, Connectivity_Info>> InfoGW;
+typedef std::map<std::string, std::map<std::string, std::map<std::string, Connectivity_Info>>> InfoGWToLte;
 
 }}
 
 struct Info;
 
 class noncobject infoDSRC;
+
+class noncobject InfoGW;
+class noncobject InfoGWToLte;
 
 packet WaveShortMessage {
 	//Version of the Wave Short Message
@@ -91,4 +100,7 @@ packet WaveShortMessage {
 	bool departure;
 	string CHId;
 	int CH_Speed;
+	bool gatewayNode;
+	InfoGW infoGw;
+	InfoGWToLte infoGWToLte;
 }
