@@ -71,9 +71,11 @@ class SimpleServerApp: public ApplicationBase {
 		long receivedMessages;
 		bool debug;
 		std::map<std::string,Info> lteDB;
+		std::map<std::string,Info> CHInfo;
 		RequestRecord reqRecord;
 		std::string maxNextRoadId;
-	    InfoGWToLte infoGWToLte_var;
+	    InfoGWToLte infoGWToLte;
+
 
 
 	public:
@@ -101,6 +103,11 @@ class SimpleServerApp: public ApplicationBase {
 		double getMeanDis(std::map<std::string,Info> tempDB,std::string carId,Info carInfo);
 		double computeDis(Coord pos1,Coord pos2);
 		double getMaxDis(std::map<std::string,Info> tempDB,std::string carId,Info carInfo);
+		void pushInfoGWToLte(InfoGWToLte tempInfo);
+
+		double getTriangleArea(Coord p0, Coord p1, Coord p2);
+		bool isInTriangle(Coord a, Coord b, Coord c, Coord d);
+		bool isTriangle(Coord p0, Coord p1, Coord p2);
 
 };
 

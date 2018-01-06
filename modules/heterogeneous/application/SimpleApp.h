@@ -75,6 +75,10 @@ protected:
 	double meanSpeed;
 	int clusterSize;
 	bool hasFindGw;
+	bool isBehindGw;
+	simtime_t lastUpdateTime;
+	double lastSpeed;
+	Coord lastCoorD;
 	std::map<std::string,Info> vehicleInfo;
 	std::map<std::string,Info> vehicleInfoCH;
 	std::queue<std::string> clusterQueue;
@@ -105,6 +109,7 @@ protected:
     Coord getCurrentPos(const simtime_t& t);
     std::string getCurrentRoadId();
     std::string getCurrentJunctionId(std::string roadId);
+    std::string getLastJunctionId(std::string roadId);
     std::string getNextRoadId(std::list<std::string> route,std::string roadId);
     std::list<std::string> getCurrentRoute();
 
@@ -130,6 +135,11 @@ protected:
 	void setVehicleState(int value);
 	int getVehicleState();
 	void findTwoGW(std::map<std::string,Info> tempInfo);
+	double getAcceleration();
+	double getEffictiveTime();
+	double getDistanceToIntersection();
+	void updateRecordLastTime();
+	double getTimeDelay(HeterogeneousMessage *receiveMessage);
 
 	void pushVehicleInfo(std::string carId,Info carInfo);
 	std::map<std::string,Info> getVehicleInfoofTempCluster();

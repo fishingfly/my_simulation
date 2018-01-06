@@ -48,13 +48,13 @@ void SimpleServerApp::handleMessageWhenUp(cMessage *msg){
 	HeterogeneousMessage* receiveMessage = dynamic_cast<HeterogeneousMessage*>(msg);
 	if(receiveMessage)
 	{
-		std::cerr<<"LLLLL"<<std::endl;
+		std::cerr<<"# LTE has received a message from a CH or tempCH ! #"<<std::endl;
 	    receivedMessages++;
 		tempCHMsgToDB(receiveMessage);//UPdate lte DB
 		if(receiveMessage->getMsgState() == 2)
 		{
-	        std::string sourceAddress=gatherFromDB();
-	        if(sourceAddress!="")
+	        std::string sourceAddress = gatherFromDB();
+	        if(sourceAddress != "")
 	        {
 	            std::cout << "[SimpleServerApp, " << simTime() << "] Received Heterogeneous Message from " << sourceAddress << std::endl;
 	            /*reply a message to vehicle*/
@@ -67,6 +67,9 @@ void SimpleServerApp::handleMessageWhenUp(cMessage *msg){
 	        }
 		} else if (receiveMessage->getMsgState() == 4) {
 		    //process routing message
+		    pushInfoGWToLte(receiveMessage->getInfoGWToLte());
+		    //time to multi-cast to several CHs
+
 
 		}
 	}
@@ -90,7 +93,14 @@ void SimpleServerApp::tempCHMsgToDB(HeterogeneousMessage* heterogeneousMessage)
 {
     std::map<std::string,Info> tempInfo;
     // update lteDB
-    tempInfo=heterogeneousMessage->getTempCHInfo();
+    if ((heterogeneousMessage->getTempCHInfo()).size() != 0 && (heterogeneousMessage->getCHInfo()).size() == 0) {
+        tempInfo=heterogeneousMessage->getTempCHInfo();
+    } else if ((heterogeneousMessage->getCHInfo()).size() != 0){
+        tempInfo=heterogeneousMessage->getCHInfo();
+    }
+    // store CH info for routing
+    CHInfo.insert(std::make_pair(heterogeneousMessage->getSourceAddress(),tempInfo[heterogeneousMessage->getSourceAddress()]));
+
     std::map<std::string,Info>::iterator it_temp=tempInfo.begin();
     //set request
     RequestRecord tempRecord;
@@ -114,12 +124,12 @@ void SimpleServerApp::analyzeCHMsg(HeterogeneousMessage* heterogeneousMessage)
 
 std::string SimpleServerApp::gatherFromDB()
 {
-    RequestRecord rr=getRequestInfo();
-    std::map<std::string,Info>::iterator it_findMax=lteDB.begin();
+    RequestRecord rr = getRequestInfo();
+    std::map<std::string,Info>::iterator it_findMax = lteDB.begin();
     std::map<std::string,int> numOfNextRoad;
-    for(;it_findMax!=lteDB.end();it_findMax++)
+    for(;it_findMax != lteDB.end();it_findMax++)
     {
-        if(it_findMax->second.junctionId==rr.requestJuctionId)
+        if(it_findMax->second.junctionId == rr.requestJuctionId)
         {
             if(numOfNextRoad.count(it_findMax->second.nextRoadId)>0)
             {
@@ -130,97 +140,97 @@ std::string SimpleServerApp::gatherFromDB()
         }
     }
     //find the maxnumber of nextRoadId
-    std::map<std::string,int>::iterator it_numOfNextRoad=numOfNextRoad.begin();
+    std::map<std::string,int>::iterator it_numOfNextRoad = numOfNextRoad.begin();
     std::string tempMaxNextRoadId;
-    int tempNum=it_numOfNextRoad->second;
-    for(;it_numOfNextRoad!=numOfNextRoad.end();it_numOfNextRoad++)
+    int tempNum = it_numOfNextRoad->second;
+    for(;it_numOfNextRoad != numOfNextRoad.end();it_numOfNextRoad++)
     {
-        if(it_numOfNextRoad->second>=tempNum)
+        if(it_numOfNextRoad->second >= tempNum)
         {
-            tempNum=it_numOfNextRoad->second;
-            tempMaxNextRoadId=it_numOfNextRoad->first;
+            tempNum = it_numOfNextRoad->second;
+            tempMaxNextRoadId = it_numOfNextRoad->first;
         }
     }
-    std::map<std::string,Info>::iterator it_distinguish=lteDB.begin();
+    std::map<std::string,Info>::iterator it_distinguish = lteDB.begin();
     std::map<std::string,Info> candidateOfCH;//the candidate of CH
     std::map<std::string,Info> otherCar;// other of current Road
-    for(;it_distinguish!=lteDB.end();it_distinguish++)
+    for(;it_distinguish != lteDB.end();it_distinguish++)
     {
         if(strcmp(rr.requestCurrentRoadId.c_str(),it_distinguish->second.currentRoadId.c_str())==0)//request road
         {
-            if(tempMaxNextRoadId==it_distinguish->second.nextRoadId)
+            if(tempMaxNextRoadId == it_distinguish->second.nextRoadId)
             {
                 Info tempCH;
-                tempCH.nextRoadId=it_distinguish->second.nextRoadId;
-                tempCH.pos=it_distinguish->second.pos;
-                tempCH.currentRoadId=it_distinguish->second.currentRoadId;
-                tempCH.junctionId=it_distinguish->second.junctionId;
+                tempCH.nextRoadId = it_distinguish->second.nextRoadId;
+                tempCH.pos = it_distinguish->second.pos;
+                tempCH.currentRoadId = it_distinguish->second.currentRoadId;
+                tempCH.junctionId = it_distinguish->second.junctionId;
                 candidateOfCH.insert(std::pair<std::string,Info>(it_distinguish->first,tempCH));
             }
             else
             {
                 Info tempCH;
-                tempCH.nextRoadId=it_distinguish->second.nextRoadId;
-                tempCH.pos=it_distinguish->second.pos;
-                tempCH.currentRoadId=it_distinguish->second.currentRoadId;
-                tempCH.junctionId=it_distinguish->second.junctionId;
+                tempCH.nextRoadId = it_distinguish->second.nextRoadId;
+                tempCH.pos = it_distinguish->second.pos;
+                tempCH.currentRoadId = it_distinguish->second.currentRoadId;
+                tempCH.junctionId = it_distinguish->second.junctionId;
                 otherCar.insert(std::pair<std::string,Info>(it_distinguish->first,tempCH));
             }
         }
     }
-    double weight1=0.5;
-    double weight2=0.25;
-    double weight3=0.25;
-    double disInCluster=0;
-    double disOfOther=0;
-    double maxDisOfCH=0;
-    double maxDisOfOther=0;
-    double disToLte=0;
-    double totalWeight=0;
+    double weight1 = 0.5;
+    double weight2 = 0.25;
+    double weight3 = 0.25;
+    double disInCluster = 0;
+    double disOfOther = 0;
+    double maxDisOfCH = 0;
+    double maxDisOfOther = 0;
+    double disToLte = 0;
+    double totalWeight = 0;
     std::map<std::string,Info>::iterator it_CH;
     std::map<std::string,Info>::iterator ir_Other;
     std::map<std::string,InfoAndWeigth> newCHCandidate;//has weight
-    if(candidateOfCH.size()==1)
+    if(candidateOfCH.size() == 1)
     {
 
         it_CH=candidateOfCH.begin();
-        std::string onlyChooseCHId=it_CH->first;
-        int start=onlyChooseCHId.find("[");
-        int end=onlyChooseCHId.find("]");
-        onlyChooseCHId=onlyChooseCHId.substr(start+1,end-start-1);
+        std::string onlyChooseCHId = it_CH->first;
+        int start = onlyChooseCHId.find("[");
+        int end = onlyChooseCHId.find("]");
+        onlyChooseCHId = onlyChooseCHId.substr(start+1,end-start-1);
         std::cerr<<"chooseCHId="<<onlyChooseCHId<<std::endl;
         return onlyChooseCHId;
     }
-    for(it_CH=candidateOfCH.begin();it_CH!=candidateOfCH.end();it_CH++)
+    for(it_CH = candidateOfCH.begin();it_CH != candidateOfCH.end();it_CH++)
     {
-        maxDisOfCH=getMaxDis(candidateOfCH,it_CH->first,it_CH->second);
-        maxDisOfOther=getMaxDis(otherCar,it_CH->first,it_CH->second);
-        disInCluster=getMeanDis(candidateOfCH,it_CH->first,it_CH->second);
-        disOfOther=getMeanDis(otherCar,it_CH->first,it_CH->second);
-        disToLte=computeDis(it_CH->second.pos,geteNodeBPos());
-        if(maxDisOfOther==0)
+        maxDisOfCH = getMaxDis(candidateOfCH,it_CH->first,it_CH->second);
+        maxDisOfOther = getMaxDis(otherCar,it_CH->first,it_CH->second);
+        disInCluster = getMeanDis(candidateOfCH,it_CH->first,it_CH->second);
+        disOfOther = getMeanDis(otherCar,it_CH->first,it_CH->second);
+        disToLte = computeDis(it_CH->second.pos,geteNodeBPos());
+        if(maxDisOfOther == 0)
         {
-            totalWeight=weight1*(disInCluster/maxDisOfCH)+weight3*(disToLte/500);
+            totalWeight = weight1*(disInCluster/maxDisOfCH) + weight3*(disToLte/500);
             //totalWeight=(weight1*disInCluster+weight3*disToLte)/(maxDisOfCH+1000);
         }
-        else if(maxDisOfCH==0)
+        else if(maxDisOfCH == 0)
         {
-            totalWeight=weight2*(disOfOther/maxDisOfOther)+weight3*(disToLte/500);
+            totalWeight = weight2*(disOfOther/maxDisOfOther) + weight3*(disToLte/500);
 //            totalWeight=(weight2*disOfOther+weight3*disToLte)/(maxDisOfOther+1000);
         }
-        else if(maxDisOfOther==0&&maxDisOfCH==0)
+        else if(maxDisOfOther == 0 && maxDisOfCH == 0)
         {
-            totalWeight=weight3*(disToLte/500);
+            totalWeight = weight3*(disToLte/500);
         }
         else
-            totalWeight=weight1*(disInCluster/maxDisOfCH)+weight2*(disOfOther/maxDisOfOther)+weight3*(disToLte/500);
+            totalWeight = weight1*(disInCluster/maxDisOfCH)+weight2*(disOfOther/maxDisOfOther)+weight3*(disToLte/500);
 //            totalWeight=(weight1*disInCluster+weight2*disOfOther+weight3*disToLte)/(maxDisOfCH+maxDisOfOther+1000);
         InfoAndWeigth tempData;
-        tempData.currentRoadId=it_CH->second.currentRoadId;
-        tempData.junctionId=it_CH->second.junctionId;
-        tempData.nextRoadId=it_CH->second.nextRoadId;
-        tempData.pos=it_CH->second.pos;
-        tempData.weight=totalWeight;
+        tempData.currentRoadId = it_CH->second.currentRoadId;
+        tempData.junctionId = it_CH->second.junctionId;
+        tempData.nextRoadId = it_CH->second.nextRoadId;
+        tempData.pos = it_CH->second.pos;
+        tempData.weight = totalWeight;
         newCHCandidate.insert(std::pair<std::string,InfoAndWeigth>(it_CH->first,tempData));
     }
     // find the min weight as CH
@@ -302,3 +312,49 @@ RequestRecord SimpleServerApp::getRequestInfo()
     return reqRecord;
 }
 
+void SimpleServerApp::pushInfoGWToLte(InfoGWToLte tempInfo) {
+    InfoGWToLte::iterator it;
+    it = tempInfo.begin();
+    while (it != tempInfo.end()) {
+        if (infoGWToLte.count(it->first) > 0) {
+            infoGWToLte.erase(it->first);
+        }
+        infoGWToLte.insert(std::make_pair(it->first,it->second));
+    }
+}
+
+double SimpleServerApp::getTriangleArea(Coord p0, Coord p1, Coord p2) {
+    Coord ab, bc;
+    ab.x = p1.x - p0.x;
+    ab.y = p1.y - p0.y;
+    bc.x = p2.x - p1.x;
+    bc.y = p2.y - p1.y;
+    return fabs((ab.x * bc.y - ab.y * bc.x) / 2.0);
+}
+
+bool SimpleServerApp::isInTriangle(Coord a, Coord b, Coord c, Coord d) {
+    double sabc, sadb, sbdc, sadc;
+    sabc = getTriangleArea(a, b, c);
+    sadb = getTriangleArea(a, d, b);
+    sbdc = getTriangleArea(b, d, c);
+    sadc = getTriangleArea(a, d, c);
+    double sumSuqar = sadb + sbdc + sadc;
+    if (-0.0001 < (sabc - sumSuqar) && (sabc - sumSuqar) < 0.0001) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+bool SimpleServerApp::isTriangle(Coord p0, Coord p1, Coord p2) {
+    Coord ab, bc;
+    ab.x = p1.x - p0.x;
+    ab.y = p1.y - p0.y;
+    bc.x = p2.x - p1.x;
+    bc.y = p2.y - p1.y;
+    double multipleResult = fabs((ab.x * bc.y - ab.y * bc.x) / 2.0);
+    double result = sqrt(ab.x * ab.x + ab.y * ab.y) + sqrt(bc.x * bc.x + bc.y * bc.y);
+    int cos = abs(int(multipleResult / result) * 10);
+    if (cos > 9) return true;
+    else return false;
+}

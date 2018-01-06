@@ -83,10 +83,6 @@ void SimpleApp::initialize(int stage) {
 }
 
 void SimpleApp::handleMessage(cMessage *msg) {
-    //for traffic light
-    std::cout<<((mobility->getCommandInterface())->trafficlight("2/1")).getDataFromTLFroString()<<std::endl;
-    std::cout<<((mobility->getCommandInterface())->trafficlight("2/1")).getDataFromTL()<<std::endl;
-    //end traffic light
     if (msg->isSelfMessage()) {
 	    std::cout<<"receive #self# message----------#"<<simTime().dbl()<<std::endl;
 	    switch(getVehicleState()) {
@@ -135,7 +131,12 @@ void SimpleApp::handleMessage(cMessage *msg) {
             scheduleAt(simTime() + 0.5, new cMessage("Send"));//USED FUL LTE
         }
             break;
-        case 3://CM
+        case 3: {//CM
+            if (isgatewayNode()) { // CM is a GW node
+                startBroadcast(3);
+                scheduleAt(simTime() + 5, new cMessage("Send"));//broadcast for other GWs
+            }
+        }
             break;
         case 4: {//CH
             insertCH_Id(getSumoId());// collect CH Id
@@ -154,7 +155,7 @@ void SimpleApp::handleMessage(cMessage *msg) {
                 addCHCount();
             }
             startBroadcast(4);
-            if ( clusterSize == vehicleInfoCH.size() && !(this->hasFindGw) ) {
+            if (clusterSize == vehicleInfoCH.size() && !(this->hasFindGw)) {
                 findTwoGW(vehicleInfoCH);
                 this->hasFindGw = true;
             } else {
@@ -384,16 +385,17 @@ void SimpleApp::handleMessage(cMessage *msg) {
                         std::cout<<"CM receive a tempCH"<<std::endl;
                         break;
                     case 3: {//CM receive a CM
-//                        std::cout<<"CM receive a CM"<<std::endl;
                         if (receiveMessage->getGatewayNode() && isgatewayNode()) {// gw receive a GA
                             std::cout<<"GW receive a GW"<<std::endl;
                             //the GW is neighbor GW?
                             std::string roadIdOfGw(receiveMessage->getCurrentRoadId());
-                            if(roadIdOfGw.find(getCurrentJunctionId(getCurrentRoadId())) != std::string::npos) {
+                            if(roadIdOfGw.find(getLastJunctionId(getCurrentRoadId())) != std::string::npos  || this->isBehindGw) {// behind GW
                                 //process
 
                                 // send to CH;
                                 startUnicastByGateWay(receiveMessage,getVehicleState());
+                                // self message by period time for other GW message, time needs to be dynamic
+                                scheduleAt(simTime() + 5, new cMessage("Send"));
                             } else {
                                 // drop
                             }
@@ -459,9 +461,17 @@ void SimpleApp::handleMessage(cMessage *msg) {
                                 startUnicast(receiveMessage,3);
                                 startUnicast(receiveMessage,3);
                             }
-                            else
-                            {
-                                std::cout<<"#"<<getSumoId()<<"#CM is not in this cluster"<<std::endl;
+                            else { //#CM is not in this cluster,but may for GW info
+                                if (this->isgatewayNode()) {
+                                    std::string roadIdOfCH(receiveMessage->getCurrentRoadId());
+                                    if (getLastJunctionId(getCurrentRoadId()) == (getCurrentJunctionId(roadIdOfCH)) && this->isBehindGw) {
+                                        //process the data
+                                    } else {
+                                        std::cout<<"#"<<getSumoId()<<"#CM is not in this cluster,and CM is GW, but the CH is not the neighbor cluster!"<<std::endl;
+                                    }
+                                } else {
+                                    std::cout<<"#"<<getSumoId()<<"#CM is not in this cluster"<<std::endl;
+                                }
                             }
                         }
                     }
@@ -611,6 +621,7 @@ void SimpleApp::handleMessage(cMessage *msg) {
                 break;
         }
 	}
+    updateRecordLastTime();
 }
 
 //follow codes are added by zy
@@ -646,6 +657,12 @@ std::string SimpleApp::getCurrentJunctionId(std::string roadId)
 {
     std::string tempStr;
     tempStr=roadId.substr(5,7);
+    return tempStr;
+}
+
+std::string SimpleApp::getLastJunctionId(std::string roadId) {
+    std::string tempStr;
+    tempStr=roadId.substr(0,2);
     return tempStr;
 }
 
@@ -780,6 +797,17 @@ void SimpleApp::startBroadcast(int msgState)//orginal
         sendMessage->setCHRoadID(getClusterQueue());
         sendMessage->setCHInfo(getVehicleInfoOfCluster());
         sendMessage->setCH_Speed(getSpeed());
+    }
+
+    if (isgatewayNode()) {// for CM is a GWs
+        //update GWs info
+        Info tempInfo;
+        tempInfo.currentRoadId=getCurrentRoadId();
+        tempInfo.nextRoadId=getNextRoadId(getCurrentRoute(),getCurrentRoadId());
+        tempInfo.pos=getCurrentPos(simTime());
+        tempInfo.junctionId=getCurrentJunctionId(getCurrentRoadId());
+        std::string destinationTemp("node[" + getSumoId() + "]");
+        sendMessage->setInfoGw(infoGw);
     }
     countBroadcastNum();
     send(sendMessage, toDecisionMaker);
@@ -948,6 +976,16 @@ void SimpleApp::findTwoGW(std::map<std::string,Info> tempInfo) {
     } else {
         std::cerr<<"can't find the key of CH in vehicleInfoCH,,the key is==="<<selfCar<<std::endl;
     }
+    /* filter for same path*/
+    std::map<std::string,Info> tempInfoForFind;
+    std::map<std::string,Info>::iterator it_filter;
+    it_filter = tempInfo.begin();
+    while (it_filter != tempInfo.end()) {
+        if (it_filter->second.nextRoadId == selfInfo.nextRoadId) {
+            tempInfoForFind.insert(std::make_pair(it_filter->first, it_filter->second));
+        }
+    }
+    /*find the GWs from the filter set*/
     Coord selfCoorD = selfInfo.pos;
     std::string currentJunctionId = getCurrentJunctionId(getCurrentRoadId());
     Coord currentJunctionCoorD;
@@ -963,11 +1001,11 @@ void SimpleApp::findTwoGW(std::map<std::string,Info> tempInfo) {
     selfToJunction.y = currentJunctionCoorD.y - selfCoorD.y;
     Coord temp;
     std::map<std::string,Info>::iterator it;
-    it = tempInfo.begin();
+    it = tempInfoForFind.begin();
     std::map<int, std::string> result;
     int large = 0;
     int small = 0;
-    while(it != tempInfo.end()) {
+    while(it != tempInfoForFind.end()) {
         if (it->first != selfCar) {
             temp.x = (it->second).pos.x - selfCoorD.x;
             temp.y = (it->second).pos.y - selfCoorD.y;
@@ -983,10 +1021,59 @@ void SimpleApp::findTwoGW(std::map<std::string,Info> tempInfo) {
         it ++;
     }
     /*package GW information*/
-    GwForCluster.insert(std::make_pair(result[large],tempInfo[result[large]]));
+//    GwForCluster.insert(std::make_pair(result[large],tempInfo[result[large]]));
     GwForCluster.insert(std::make_pair(result[small],tempInfo[result[small]]));
 }
 
+double SimpleApp::getAcceleration() {
+    double timeDif = simTime().dbl() - (this->lastUpdateTime).dbl();
+    double speedDif = getSpeed() - this->lastSpeed;
+    return speedDif/timeDif;
+}
+
+double SimpleApp::getEffictiveTime() {
+    double acceleration = this->getAcceleration();
+    //maybe need to divide into several condition
+    //for traffic light
+    int32_t  phaseDuration = ((mobility->getCommandInterface())->trafficlight(getCurrentJunctionId(getCurrentRoadId()))).getDataFromTLFroString();
+    int32_t  phaseTrafficLight = ((mobility->getCommandInterface())->trafficlight(getCurrentJunctionId(getCurrentRoadId()))).getDataFromTL();
+    double distanceToIntersection = getDistanceToIntersection();
+    int time;
+    if (int(distanceToIntersection - 30) > 0) { // enter intersection range
+        if (int(acceleration) == 0) {
+            time = int(phaseDuration);
+        } else if (int(acceleration) > 0) {
+            time =  fabs((this->meanSpeed - getSpeed()) / acceleration)+(distanceToIntersection - fabs((this->meanSpeed - getSpeed()) / (acceleration * 2))) / this->meanSpeed;
+        } else {
+            time = phaseDuration;
+        }
+    } else { // not enter intersetion range
+        if (int(acceleration) == 0) {
+            time = int(phaseDuration);
+        } else if (int(acceleration) > 0) {
+            time =  fabs((this->meanSpeed - getSpeed()) / acceleration)+(distanceToIntersection - fabs((this->meanSpeed - getSpeed()) / (acceleration * 2))) / this->meanSpeed;
+        } else {
+            int temp = fabs((this->meanSpeed - getSpeed()) / acceleration)+(distanceToIntersection - fabs((this->meanSpeed - getSpeed()) / (acceleration * 2))) / this->meanSpeed;
+            time = temp > phaseDuration ? temp : phaseDuration;
+        }
+    }
+    return time;
+}
+
+double SimpleApp::getDistanceToIntersection() {
+    Coord IntersectionCoord = electricMap[getCurrentJunctionId(getCurrentRoadId())];
+    Coord positionNow = getCurrentPos(simTime());
+    return sqrt((positionNow.x - IntersectionCoord.x)*(positionNow.x - IntersectionCoord.x) + (positionNow.y - IntersectionCoord.y)*(positionNow.y - IntersectionCoord.y));
+}
+
+void SimpleApp::updateRecordLastTime() {
+    this->lastSpeed = getSpeed();
+    this->lastUpdateTime = simTime();
+}
+
+double SimpleApp::getTimeDelay(HeterogeneousMessage *receiveMessage) {
+    return (simTime().dbl() - (receiveMessage->getSendingTime()).dbl());
+}
 
 void SimpleApp::pushVehicleInfo(std::string carId,Info carInfo)
 {
