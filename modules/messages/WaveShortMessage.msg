@@ -103,4 +103,6 @@ packet WaveShortMessage {
 	bool gatewayNode;
 	InfoGW infoGw;
 	InfoGWToLte infoGWToLte;
+	int msgCode;
+	int usedFor;
 }

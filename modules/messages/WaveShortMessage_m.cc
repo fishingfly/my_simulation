@@ -78,6 +78,8 @@ WaveShortMessage::WaveShortMessage(const char *name, int kind) : ::cPacket(name,
     this->CHId_var = 0;
     this->CH_Speed_var = 0;
     this->gatewayNode_var = 0;
+    this->msgCode_var = 0;
+    this->usedFor_var = 0;
 }
 
 WaveShortMessage::WaveShortMessage(const WaveShortMessage& other) : ::cPacket(other)
@@ -128,6 +130,8 @@ void WaveShortMessage::copy(const WaveShortMessage& other)
     this->gatewayNode_var = other.gatewayNode_var;
     this->infoGw_var = other.infoGw_var;
     this->infoGWToLte_var = other.infoGWToLte_var;
+    this->msgCode_var = other.msgCode_var;
+    this->usedFor_var = other.usedFor_var;
 }
 
 void WaveShortMessage::parsimPack(cCommBuffer *b)
@@ -162,6 +166,8 @@ void WaveShortMessage::parsimPack(cCommBuffer *b)
     doPacking(b,this->gatewayNode_var);
     doPacking(b,this->infoGw_var);
     doPacking(b,this->infoGWToLte_var);
+    doPacking(b,this->msgCode_var);
+    doPacking(b,this->usedFor_var);
 }
 
 void WaveShortMessage::parsimUnpack(cCommBuffer *b)
@@ -196,6 +202,8 @@ void WaveShortMessage::parsimUnpack(cCommBuffer *b)
     doUnpacking(b,this->gatewayNode_var);
     doUnpacking(b,this->infoGw_var);
     doUnpacking(b,this->infoGWToLte_var);
+    doUnpacking(b,this->msgCode_var);
+    doUnpacking(b,this->usedFor_var);
 }
 
 int WaveShortMessage::getWsmVersion() const
@@ -488,6 +496,26 @@ void WaveShortMessage::setInfoGWToLte(const InfoGWToLte& infoGWToLte)
     this->infoGWToLte_var = infoGWToLte;
 }
 
+int WaveShortMessage::getMsgCode() const
+{
+    return msgCode_var;
+}
+
+void WaveShortMessage::setMsgCode(int msgCode)
+{
+    this->msgCode_var = msgCode;
+}
+
+int WaveShortMessage::getUsedFor() const
+{
+    return usedFor_var;
+}
+
+void WaveShortMessage::setUsedFor(int usedFor)
+{
+    this->usedFor_var = usedFor;
+}
+
 class WaveShortMessageDescriptor : public cClassDescriptor
 {
   public:
@@ -535,7 +563,7 @@ const char *WaveShortMessageDescriptor::getProperty(const char *propertyname) co
 int WaveShortMessageDescriptor::getFieldCount(void *object) const
 {
     cClassDescriptor *basedesc = getBaseClassDescriptor();
-    return basedesc ? 29+basedesc->getFieldCount(object) : 29;
+    return basedesc ? 31+basedesc->getFieldCount(object) : 31;
 }
 
 unsigned int WaveShortMessageDescriptor::getFieldTypeFlags(void *object, int field) const
@@ -576,8 +604,10 @@ unsigned int WaveShortMessageDescriptor::getFieldTypeFlags(void *object, int fie
         FD_ISEDITABLE,
         FD_ISCOMPOUND,
         FD_ISCOMPOUND,
+        FD_ISEDITABLE,
+        FD_ISEDITABLE,
     };
-    return (field>=0 && field<29) ? fieldTypeFlags[field] : 0;
+    return (field>=0 && field<31) ? fieldTypeFlags[field] : 0;
 }
 
 const char *WaveShortMessageDescriptor::getFieldName(void *object, int field) const
@@ -618,8 +648,10 @@ const char *WaveShortMessageDescriptor::getFieldName(void *object, int field) co
         "gatewayNode",
         "infoGw",
         "infoGWToLte",
+        "msgCode",
+        "usedFor",
     };
-    return (field>=0 && field<29) ? fieldNames[field] : NULL;
+    return (field>=0 && field<31) ? fieldNames[field] : NULL;
 }
 
 int WaveShortMessageDescriptor::findField(void *object, const char *fieldName) const
@@ -655,6 +687,8 @@ int WaveShortMessageDescriptor::findField(void *object, const char *fieldName) c
     if (fieldName[0]=='g' && strcmp(fieldName, "gatewayNode")==0) return base+26;
     if (fieldName[0]=='i' && strcmp(fieldName, "infoGw")==0) return base+27;
     if (fieldName[0]=='i' && strcmp(fieldName, "infoGWToLte")==0) return base+28;
+    if (fieldName[0]=='m' && strcmp(fieldName, "msgCode")==0) return base+29;
+    if (fieldName[0]=='u' && strcmp(fieldName, "usedFor")==0) return base+30;
     return basedesc ? basedesc->findField(object, fieldName) : -1;
 }
 
@@ -696,8 +730,10 @@ const char *WaveShortMessageDescriptor::getFieldTypeString(void *object, int fie
         "bool",
         "InfoGW",
         "InfoGWToLte",
+        "int",
+        "int",
     };
-    return (field>=0 && field<29) ? fieldTypeStrings[field] : NULL;
+    return (field>=0 && field<31) ? fieldTypeStrings[field] : NULL;
 }
 
 const char *WaveShortMessageDescriptor::getFieldProperty(void *object, int field, const char *propertyname) const
@@ -766,6 +802,8 @@ std::string WaveShortMessageDescriptor::getFieldAsString(void *object, int field
         case 26: return bool2string(pp->getGatewayNode());
         case 27: {std::stringstream out; out << pp->getInfoGw(); return out.str();}
         case 28: {std::stringstream out; out << pp->getInfoGWToLte(); return out.str();}
+        case 29: return long2string(pp->getMsgCode());
+        case 30: return long2string(pp->getUsedFor());
         default: return "";
     }
 }
@@ -801,6 +839,8 @@ bool WaveShortMessageDescriptor::setFieldAsString(void *object, int field, int i
         case 24: pp->setCHId((value)); return true;
         case 25: pp->setCH_Speed(string2long(value)); return true;
         case 26: pp->setGatewayNode(string2bool(value)); return true;
+        case 29: pp->setMsgCode(string2long(value)); return true;
+        case 30: pp->setUsedFor(string2long(value)); return true;
         default: return false;
     }
 }

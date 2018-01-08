@@ -75,7 +75,10 @@ class SimpleServerApp: public ApplicationBase {
 		RequestRecord reqRecord;
 		std::string maxNextRoadId;
 	    InfoGWToLte infoGWToLte;
-
+	    bool hasBroadcast;
+	    std::vector<std::string> choosedCHs;
+	    int lastCHInfoSize;
+	    bool CHHasChangedRoad;
 
 
 	public:
@@ -108,6 +111,11 @@ class SimpleServerApp: public ApplicationBase {
 		double getTriangleArea(Coord p0, Coord p1, Coord p2);
 		bool isInTriangle(Coord a, Coord b, Coord c, Coord d);
 		bool isTriangle(Coord p0, Coord p1, Coord p2);
+
+		void selectCHsAndUnicast();
+		void startMulticastToCHs(int number);
+		int getUniqueCode();
+
 
 };
 

@@ -50,10 +50,19 @@ enum NodeState
     dismiss//7
 };
 
+#define BuildConnection 1
+#define BroadcastTopology 2
+#define RelayRoute 3
+
 struct CH_Rocord
 {
     simtime_t start_Time;
     simtime_t now_Time;
+};
+
+struct RouteInfo {
+    std::string nodeId;
+    LAddress::L2Type macAddr;
 };
 
 class SimpleApp: public cSimpleModule {
@@ -89,6 +98,8 @@ protected:
 	InfoGWToLte infoGwToLte;
 	std::map<std::string, Coord> electricMap;
 	std::map<std::string,Info> GwForCluster;
+	std::set<int> topologySet;
+	std::vector<RouteInfo> routeInfo;
 
 	//record DATA
 	int overHead_clustering;
@@ -173,6 +184,10 @@ protected:
     InfoGW getInfoGw();
     void setInfoGwToLte(InfoGWToLte temp);
     InfoGWToLte getInfoGwToLte();
+
+    void startBroadcastTopologyInfo(int code);
+    void relayRoutingMsg(HeterogeneousMessage *receiveMessage);
+
 
 	//record date
 	void insertCH_Id(std::string carId);

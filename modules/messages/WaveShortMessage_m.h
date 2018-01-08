@@ -34,7 +34,6 @@ struct Info
     std::string currentRoadId;
     std::string junctionId;
     Coord pos;
-    LAddress::L2Type macAddrGW;
 };
 
 struct Connectivity_Info {
@@ -92,6 +91,8 @@ typedef std::map<std::string, std::map<std::string, std::map<std::string, Connec
  *     bool gatewayNode;
  *     InfoGW infoGw;
  *     InfoGWToLte infoGWToLte;
+ *     int msgCode;
+ *     int usedFor;
  * }
  * </pre>
  */
@@ -127,6 +128,8 @@ class WaveShortMessage : public ::cPacket
     bool gatewayNode_var;
     InfoGW infoGw_var;
     InfoGWToLte infoGWToLte_var;
+    int msgCode_var;
+    int usedFor_var;
 
   private:
     void copy(const WaveShortMessage& other);
@@ -211,6 +214,10 @@ class WaveShortMessage : public ::cPacket
     virtual InfoGWToLte& getInfoGWToLte();
     virtual const InfoGWToLte& getInfoGWToLte() const {return const_cast<WaveShortMessage*>(this)->getInfoGWToLte();}
     virtual void setInfoGWToLte(const InfoGWToLte& infoGWToLte);
+    virtual int getMsgCode() const;
+    virtual void setMsgCode(int msgCode);
+    virtual int getUsedFor() const;
+    virtual void setUsedFor(int usedFor);
 };
 
 inline void doPacking(cCommBuffer *b, WaveShortMessage& obj) {obj.parsimPack(b);}

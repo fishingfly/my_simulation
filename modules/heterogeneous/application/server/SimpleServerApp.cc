@@ -69,7 +69,16 @@ void SimpleServerApp::handleMessageWhenUp(cMessage *msg){
 		    //process routing message
 		    pushInfoGWToLte(receiveMessage->getInfoGWToLte());
 		    //time to multi-cast to several CHs
-
+		    selectCHsAndUnicast();
+		    //multicast by condition
+		    if ((!hasBroadcast && CHInfo.size() == this->lastCHInfoSize) || this->CHHasChangedRoad) {
+		        startMulticastToCHs(getUniqueCode());
+		        this->hasBroadcast = true;
+		    }
+            //CLEAR
+		    this->lastCHInfoSize = CHInfo.size();
+		    this->CHHasChangedRoad = false;
+		    choosedCHs.clear();
 
 		}
 	}
@@ -111,6 +120,9 @@ void SimpleServerApp::tempCHMsgToDB(HeterogeneousMessage* heterogeneousMessage)
     {
         if(lteDB.count(it_temp->first)>0)
         {
+            if (lteDB[it_temp->first].currentRoadId != (it_temp->second).currentRoadId) {
+                this->CHHasChangedRoad = true;
+            }
             lteDB.erase(it_temp->first);
         }
         lteDB.insert(std::pair<std::string,Info>(it_temp->first,it_temp->second));
@@ -357,4 +369,60 @@ bool SimpleServerApp::isTriangle(Coord p0, Coord p1, Coord p2) {
     int cos = abs(int(multipleResult / result) * 10);
     if (cos > 9) return true;
     else return false;
+}
+
+void SimpleServerApp::selectCHsAndUnicast() {
+    std::map<std::string,Info>::iterator it = CHInfo.begin();
+    if (CHInfo.size() < 3) {
+        while( it != CHInfo.end()) {
+            choosedCHs.push_back(it->first);
+            it++;
+        }
+    } else {
+        std::vector<std::string> nodeName;
+        it = CHInfo.begin();
+        while( it != CHInfo.end()) {
+            nodeName.push_back(it->first);
+            it++;
+        }
+        for (int i = 0; i < nodeName.size(); i++) {
+            for (int j = 0; j < nodeName.size(); j++) {
+                if (j == i) continue;
+                for (int n = 0; n < nodeName.size(); n++) {
+                    if (n == i || n == j) continue;
+                    if (!isTriangle(CHInfo[nodeName[i]].pos, CHInfo[nodeName[j]].pos, CHInfo[nodeName[n]].pos)) {
+                        continue;
+                    } else {
+                        if (isInTriangle(CHInfo[nodeName[i]].pos, CHInfo[nodeName[j]].pos, CHInfo[nodeName[n]].pos, geteNodeBPos())) {
+                            choosedCHs.push_back(nodeName[i]);
+                            choosedCHs.push_back(nodeName[j]);
+                            choosedCHs.push_back(nodeName[n]);
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if (choosedCHs.size() < 3) {
+        std::cerr<<"# something is wrong with choosedCHs for topology info broadcast!"<<std::endl;
+    }
+}
+void SimpleServerApp::startMulticastToCHs( int number ) {
+    for (int i = 0; i < choosedCHs.size(); i++) {
+        /*reply a message to vehicle*/
+        HeterogeneousMessage *reply = new HeterogeneousMessage("Server Reply");
+        IPv4Address address = manager->getIPAddressForID(choosedCHs[i]);
+        reply->setSourceAddress("server");
+        reply->setMsgState(5);
+        reply->setInfoGWToLte(infoGWToLte);
+        reply->setMsgCode(number);
+        std::cerr << "[LTE_Server_App, " << simTime() << "] Sending routing Msg back to " << address << std::endl;
+        socket.sendTo(reply, address, 4242);
+    }
+}
+
+int SimpleServerApp::getUniqueCode() {
+    srand((rand())%10);
+    return rand();
 }
