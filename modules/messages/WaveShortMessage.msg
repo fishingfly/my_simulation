@@ -35,6 +35,7 @@ class noncobject clusterQueue;
 
 cplusplus {{
 #include <map>
+#include <vector>
 #include <queue>
 struct Info
 {
@@ -52,7 +53,7 @@ struct Connectivity_Info {
 typedef std::map<std::string, Info> infoDSRC;
 typedef std::map<std::string, std::map<std::string, Connectivity_Info>> InfoGW;
 typedef std::map<std::string, std::map<std::string, std::map<std::string, Connectivity_Info>>> InfoGWToLte;
-
+typedef std::vector<Connectivity_Info> RouteTable;
 }}
 
 struct Info;
@@ -61,6 +62,7 @@ class noncobject infoDSRC;
 
 class noncobject InfoGW;
 class noncobject InfoGWToLte;
+class noncobject RouteTable;
 
 packet WaveShortMessage {
 	//Version of the Wave Short Message
@@ -105,4 +107,5 @@ packet WaveShortMessage {
 	InfoGWToLte infoGWToLte;
 	int msgCode;
 	int usedFor;
+	RouteTable routeTable;
 }

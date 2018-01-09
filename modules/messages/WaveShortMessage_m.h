@@ -27,6 +27,7 @@ typedef std::queue<std::string> clusterQueue;
 
 // cplusplus {{
 #include <map>
+#include <vector>
 #include <queue>
 struct Info
 {
@@ -44,10 +45,11 @@ struct Connectivity_Info {
 typedef std::map<std::string, Info> infoDSRC;
 typedef std::map<std::string, std::map<std::string, Connectivity_Info>> InfoGW;
 typedef std::map<std::string, std::map<std::string, std::map<std::string, Connectivity_Info>>> InfoGWToLte;
+typedef std::vector<Connectivity_Info> RouteTable;
 // }}
 
 /**
- * Class generated from <tt>veins/modules/messages/WaveShortMessage.msg:65</tt> by nedtool.
+ * Class generated from <tt>veins/modules/messages/WaveShortMessage.msg:67</tt> by nedtool.
  * <pre>
  * packet WaveShortMessage
  * {
@@ -93,6 +95,7 @@ typedef std::map<std::string, std::map<std::string, std::map<std::string, Connec
  *     InfoGWToLte infoGWToLte;
  *     int msgCode;
  *     int usedFor;
+ *     RouteTable routeTable;
  * }
  * </pre>
  */
@@ -130,6 +133,7 @@ class WaveShortMessage : public ::cPacket
     InfoGWToLte infoGWToLte_var;
     int msgCode_var;
     int usedFor_var;
+    RouteTable routeTable_var;
 
   private:
     void copy(const WaveShortMessage& other);
@@ -218,6 +222,9 @@ class WaveShortMessage : public ::cPacket
     virtual void setMsgCode(int msgCode);
     virtual int getUsedFor() const;
     virtual void setUsedFor(int usedFor);
+    virtual RouteTable& getRouteTable();
+    virtual const RouteTable& getRouteTable() const {return const_cast<WaveShortMessage*>(this)->getRouteTable();}
+    virtual void setRouteTable(const RouteTable& routeTable);
 };
 
 inline void doPacking(cCommBuffer *b, WaveShortMessage& obj) {obj.parsimPack(b);}

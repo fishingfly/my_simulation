@@ -132,6 +132,7 @@ void WaveShortMessage::copy(const WaveShortMessage& other)
     this->infoGWToLte_var = other.infoGWToLte_var;
     this->msgCode_var = other.msgCode_var;
     this->usedFor_var = other.usedFor_var;
+    this->routeTable_var = other.routeTable_var;
 }
 
 void WaveShortMessage::parsimPack(cCommBuffer *b)
@@ -168,6 +169,7 @@ void WaveShortMessage::parsimPack(cCommBuffer *b)
     doPacking(b,this->infoGWToLte_var);
     doPacking(b,this->msgCode_var);
     doPacking(b,this->usedFor_var);
+    doPacking(b,this->routeTable_var);
 }
 
 void WaveShortMessage::parsimUnpack(cCommBuffer *b)
@@ -204,6 +206,7 @@ void WaveShortMessage::parsimUnpack(cCommBuffer *b)
     doUnpacking(b,this->infoGWToLte_var);
     doUnpacking(b,this->msgCode_var);
     doUnpacking(b,this->usedFor_var);
+    doUnpacking(b,this->routeTable_var);
 }
 
 int WaveShortMessage::getWsmVersion() const
@@ -516,6 +519,16 @@ void WaveShortMessage::setUsedFor(int usedFor)
     this->usedFor_var = usedFor;
 }
 
+RouteTable& WaveShortMessage::getRouteTable()
+{
+    return routeTable_var;
+}
+
+void WaveShortMessage::setRouteTable(const RouteTable& routeTable)
+{
+    this->routeTable_var = routeTable;
+}
+
 class WaveShortMessageDescriptor : public cClassDescriptor
 {
   public:
@@ -563,7 +576,7 @@ const char *WaveShortMessageDescriptor::getProperty(const char *propertyname) co
 int WaveShortMessageDescriptor::getFieldCount(void *object) const
 {
     cClassDescriptor *basedesc = getBaseClassDescriptor();
-    return basedesc ? 31+basedesc->getFieldCount(object) : 31;
+    return basedesc ? 32+basedesc->getFieldCount(object) : 32;
 }
 
 unsigned int WaveShortMessageDescriptor::getFieldTypeFlags(void *object, int field) const
@@ -606,8 +619,9 @@ unsigned int WaveShortMessageDescriptor::getFieldTypeFlags(void *object, int fie
         FD_ISCOMPOUND,
         FD_ISEDITABLE,
         FD_ISEDITABLE,
+        FD_ISCOMPOUND,
     };
-    return (field>=0 && field<31) ? fieldTypeFlags[field] : 0;
+    return (field>=0 && field<32) ? fieldTypeFlags[field] : 0;
 }
 
 const char *WaveShortMessageDescriptor::getFieldName(void *object, int field) const
@@ -650,8 +664,9 @@ const char *WaveShortMessageDescriptor::getFieldName(void *object, int field) co
         "infoGWToLte",
         "msgCode",
         "usedFor",
+        "routeTable",
     };
-    return (field>=0 && field<31) ? fieldNames[field] : NULL;
+    return (field>=0 && field<32) ? fieldNames[field] : NULL;
 }
 
 int WaveShortMessageDescriptor::findField(void *object, const char *fieldName) const
@@ -689,6 +704,7 @@ int WaveShortMessageDescriptor::findField(void *object, const char *fieldName) c
     if (fieldName[0]=='i' && strcmp(fieldName, "infoGWToLte")==0) return base+28;
     if (fieldName[0]=='m' && strcmp(fieldName, "msgCode")==0) return base+29;
     if (fieldName[0]=='u' && strcmp(fieldName, "usedFor")==0) return base+30;
+    if (fieldName[0]=='r' && strcmp(fieldName, "routeTable")==0) return base+31;
     return basedesc ? basedesc->findField(object, fieldName) : -1;
 }
 
@@ -732,8 +748,9 @@ const char *WaveShortMessageDescriptor::getFieldTypeString(void *object, int fie
         "InfoGWToLte",
         "int",
         "int",
+        "RouteTable",
     };
-    return (field>=0 && field<31) ? fieldTypeStrings[field] : NULL;
+    return (field>=0 && field<32) ? fieldTypeStrings[field] : NULL;
 }
 
 const char *WaveShortMessageDescriptor::getFieldProperty(void *object, int field, const char *propertyname) const
@@ -804,6 +821,7 @@ std::string WaveShortMessageDescriptor::getFieldAsString(void *object, int field
         case 28: {std::stringstream out; out << pp->getInfoGWToLte(); return out.str();}
         case 29: return long2string(pp->getMsgCode());
         case 30: return long2string(pp->getUsedFor());
+        case 31: {std::stringstream out; out << pp->getRouteTable(); return out.str();}
         default: return "";
     }
 }
@@ -862,6 +880,7 @@ const char *WaveShortMessageDescriptor::getFieldStructName(void *object, int fie
         case 22: return opp_typename(typeid(clusterQueue));
         case 27: return opp_typename(typeid(InfoGW));
         case 28: return opp_typename(typeid(InfoGWToLte));
+        case 31: return opp_typename(typeid(RouteTable));
         default: return NULL;
     };
 }
@@ -884,6 +903,7 @@ void *WaveShortMessageDescriptor::getFieldStructPointer(void *object, int field,
         case 22: return (void *)(&pp->getCHRoadID()); break;
         case 27: return (void *)(&pp->getInfoGw()); break;
         case 28: return (void *)(&pp->getInfoGWToLte()); break;
+        case 31: return (void *)(&pp->getRouteTable()); break;
         default: return NULL;
     }
 }

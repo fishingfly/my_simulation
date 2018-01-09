@@ -63,6 +63,7 @@ struct CH_Rocord
 struct RouteInfo {
     std::string nodeId;
     LAddress::L2Type macAddr;
+    double connectivityValue;
 };
 
 class SimpleApp: public cSimpleModule {
@@ -99,7 +100,9 @@ protected:
 	std::map<std::string, Coord> electricMap;
 	std::map<std::string,Info> GwForCluster;
 	std::set<int> topologySet;
-	std::vector<RouteInfo> routeInfo;
+
+	std::map<double, std::vector<Connectivity_Info>> routeForSelected;
+	std::vector<Connectivity_Info> routeTable;
 
 	//record DATA
 	int overHead_clustering;
@@ -173,6 +176,7 @@ protected:
 	std::string getCHId();
 
 	int getSpeed();
+	bool isNeighborGW(std::string GWRoadId, std::string selfRoadId);
 
 	void recordMacAddr_CH(LAddress::L2Type temp);
 
@@ -187,6 +191,7 @@ protected:
 
     void startBroadcastTopologyInfo(int code);
     void relayRoutingMsg(HeterogeneousMessage *receiveMessage);
+    void findRoutePath( std::vector<Connectivity_Info> onePath, double conenctivity_value,int currentHop, std::string roadIdSourceNode, std::string targetIntersectionId);
 
 
 	//record date
