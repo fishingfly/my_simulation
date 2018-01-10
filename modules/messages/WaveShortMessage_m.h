@@ -35,6 +35,7 @@ struct Info
     std::string currentRoadId;
     std::string junctionId;
     Coord pos;
+    LAddress::L2Type macAddr;
 };
 
 struct Connectivity_Info {

@@ -53,6 +53,7 @@ enum NodeState
 #define BuildConnection 1
 #define BroadcastTopology 2
 #define RelayRoute 3
+#define ToBeGw 4
 
 struct CH_Rocord
 {
@@ -145,6 +146,7 @@ protected:
 	void sendToLTE(int msgState);
 	void startUnicast(HeterogeneousMessage *receiveMessage,int msgState);
 	void startUnicastByGateWay(HeterogeneousMessage *receiveMessage,int msgState);
+	void startUnicastToGateWay(std::string GWID);
 	void startUnicastDeparture(LAddress::L2Type macAddr,int msgState,std::string Id_CH);
 	void setVehicleState(int value);
 	int getVehicleState();

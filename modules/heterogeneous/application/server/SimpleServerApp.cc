@@ -69,11 +69,14 @@ void SimpleServerApp::handleMessageWhenUp(cMessage *msg){
 		    //process routing message
 		    pushInfoGWToLte(receiveMessage->getInfoGWToLte());
 		    //time to multi-cast to several CHs
-		    selectCHsAndUnicast();
+            selectCHsAndUnicast();
 		    //multicast by condition
-		    if ((!hasBroadcast && CHInfo.size() == this->lastCHInfoSize) || this->CHHasChangedRoad) {
-		        startMulticastToCHs(getUniqueCode());
-		        this->hasBroadcast = true;
+		    if ((!hasBroadcast && CHInfo.size() == this->lastCHInfoSize) || (this->CHHasChangedRoad) ) {
+		       if (((this->infoGWToLte).size() > 0)) {
+		           std::cout<<(this->infoGWToLte).size()<<std::endl;
+                   startMulticastToCHs(getUniqueCode());
+                   this->hasBroadcast = true;
+		       }
 		    }
             //CLEAR
 		    this->lastCHInfoSize = CHInfo.size();
@@ -106,9 +109,11 @@ void SimpleServerApp::tempCHMsgToDB(HeterogeneousMessage* heterogeneousMessage)
         tempInfo=heterogeneousMessage->getTempCHInfo();
     } else if ((heterogeneousMessage->getCHInfo()).size() != 0){
         tempInfo=heterogeneousMessage->getCHInfo();
+        // store CH info for routing
+        std::string tempTest(heterogeneousMessage->getSourceAddress());
+        std::string nodeName("node[" +tempTest+ "]");
+        CHInfo.insert(std::make_pair(tempTest,tempInfo[nodeName]));
     }
-    // store CH info for routing
-    CHInfo.insert(std::make_pair(heterogeneousMessage->getSourceAddress(),tempInfo[heterogeneousMessage->getSourceAddress()]));
 
     std::map<std::string,Info>::iterator it_temp=tempInfo.begin();
     //set request
@@ -204,7 +209,6 @@ std::string SimpleServerApp::gatherFromDB()
     std::map<std::string,InfoAndWeigth> newCHCandidate;//has weight
     if(candidateOfCH.size() == 1)
     {
-
         it_CH=candidateOfCH.begin();
         std::string onlyChooseCHId = it_CH->first;
         int start = onlyChooseCHId.find("[");
@@ -249,17 +253,17 @@ std::string SimpleServerApp::gatherFromDB()
     std::map<std::string,InfoAndWeigth>::iterator it_end=newCHCandidate.begin();
     std::string choosedCHId;
     double w=1;
-    for(;it_end!=newCHCandidate.end();it_end++)
+    for(;it_end != newCHCandidate.end();it_end++)
     {
         if(it_end->second.weight<w)
         {
-            choosedCHId=it_end->first;
-            w=it_end->second.weight;
+            choosedCHId = it_end->first;
+            w = it_end->second.weight;
         }
     }
-    int start=choosedCHId.find("[");
-    int end=choosedCHId.find("]");
-    choosedCHId=choosedCHId.substr(start+1,end-start-1);
+    int start = choosedCHId.find("[");
+    int end = choosedCHId.find("]");
+    choosedCHId = choosedCHId.substr(start+1,end-start-1);
     std::cerr<<"chooseCHId="<<choosedCHId<<std::endl;
     return choosedCHId;
 }
@@ -328,10 +332,13 @@ void SimpleServerApp::pushInfoGWToLte(InfoGWToLte tempInfo) {
     InfoGWToLte::iterator it;
     it = tempInfo.begin();
     while (it != tempInfo.end()) {
-        if (infoGWToLte.count(it->first) > 0) {
+          if (infoGWToLte.count(it->first) > 0) {
             infoGWToLte.erase(it->first);
         }
-        infoGWToLte.insert(std::make_pair(it->first,it->second));
+        if ((it->second).size() > 0) {
+            infoGWToLte.insert(std::make_pair(it->first,it->second));
+        }
+        it++;
     }
 }
 

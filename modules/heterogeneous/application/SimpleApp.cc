@@ -77,7 +77,7 @@ void SimpleApp::initialize(int stage) {
 		overHead_clustering=0;
 		broadcastNum = 0;
 		unicastNum = 0;
-
+		this->gatewayNode = false;
 		scheduleAt(simTime() + 0.5, new cMessage("Send"));
 	}
 }
@@ -142,7 +142,7 @@ void SimpleApp::handleMessage(cMessage *msg) {
             insertCH_Id(getSumoId());// collect CH Id
             updateCH_Info(getSumoId(),simTime());//collect CH time
             std::map<std::string,Info> carInfo=getVehicleInfoOfCluster();
-            std::cout<<"cluster member:";
+            std::cerr<<"cluster member:";
             std::map<std::string,Info>::iterator it=carInfo.begin();
             for(;it!=carInfo.end();it++)
                 std::cout<<it->first<<"  ";
@@ -153,15 +153,20 @@ void SimpleApp::handleMessage(cMessage *msg) {
                     infoGwToLte.erase(getCurrentRoadId());
                 }
                 infoGwToLte.insert(std::make_pair(getCurrentRoadId(), this->infoGw));
-                sendToLTE(getVehicleState());
+                if (this->hasFindGw) {
+                    sendToLTE(getVehicleState());
+                }
                 setCHCount(0);
             }
             else {
                 addCHCount();
             }
             startBroadcast(4);
-            if (clusterSize == vehicleInfoCH.size() && !(this->hasFindGw)) {
+            if (clusterSize == vehicleInfoCH.size() && !(this->hasFindGw) && vehicleInfoCH.size() > 5) {
                 findTwoGW(vehicleInfoCH);
+                //unicast to CM
+                std::map<std::string,Info>::iterator it_forName =  GwForCluster.begin();
+                startUnicastToGateWay(it_forName->first);
                 this->hasFindGw = true;
             } else {
                 clusterSize = vehicleInfoCH.size();
@@ -264,7 +269,7 @@ void SimpleApp::handleMessage(cMessage *msg) {
                         break;
                     case 4: {//SE receive CH msg
                         if(memberOfCluster(receiveMessage->getCHRoadID(),getCurrentRoadId())) {
-                            if(getCurrentRoadId()==receiveMessage->getCurrentRoadId()) {//currentRoad must be same
+                            if(getCurrentRoadId() == receiveMessage->getCurrentRoadId()) {//currentRoad must be same
                                 setVehicleState(3);//set to be CM
                                 setCHId(receiveMessage->getSourceAddress());
                                 startUnicast(receiveMessage,getVehicleState());
@@ -279,7 +284,7 @@ void SimpleApp::handleMessage(cMessage *msg) {
                         std::cerr<<"SE receive LTE Message"<<endl;
                         setVehicleState(4);//set to be CH
                         startBroadcast(4);
-                        scheduleAt(simTime() + 0.1, new cMessage("Send"));
+                        scheduleAt(simTime() + 0.01, new cMessage("Send"));
                     }
                         break;
                     default:
@@ -299,6 +304,7 @@ void SimpleApp::handleMessage(cMessage *msg) {
                                 tempInfo.nextRoadId=receiveMessage->getNodeNextRoadId();
                                 tempInfo.pos=receiveMessage->getSenderPos();
                                 tempInfo.junctionId=getCurrentJunctionId(receiveMessage->getCurrentRoadId());
+                                tempInfo.macAddr = receiveMessage->getMacAddr();
                                 std::string temp(receiveMessage->getSourceAddress());
                                 std::string destinationTemp("node[" +temp+ "]");
                                 pushVehicleInfo(destinationTemp,tempInfo);
@@ -310,6 +316,7 @@ void SimpleApp::handleMessage(cMessage *msg) {
                                 tempInfo.nextRoadId=receiveMessage->getNodeNextRoadId();
                                 tempInfo.pos=receiveMessage->getSenderPos();
                                 tempInfo.junctionId=getCurrentJunctionId(receiveMessage->getCurrentRoadId());
+                                tempInfo.macAddr = receiveMessage->getMacAddr();
                                 std::string temp(receiveMessage->getSourceAddress());
                                 std::string destinationTemp("node[" +temp+ "]");
                                 pushVehicleInfo(destinationTemp,tempInfo);
@@ -328,6 +335,7 @@ void SimpleApp::handleMessage(cMessage *msg) {
                                 tempInfo.nextRoadId=receiveMessage->getNodeNextRoadId();
                                 tempInfo.pos=receiveMessage->getSenderPos();
                                 tempInfo.junctionId=getCurrentJunctionId(receiveMessage->getCurrentRoadId());
+                                tempInfo.macAddr = receiveMessage->getMacAddr();
                                 std::string temp(receiveMessage->getSourceAddress());
                                 std::string destinationTemp("node[" +temp+ "]");
                                 pushVehicleInfo(destinationTemp,tempInfo);
@@ -339,6 +347,7 @@ void SimpleApp::handleMessage(cMessage *msg) {
                                 tempInfo.nextRoadId=receiveMessage->getNodeNextRoadId();
                                 tempInfo.pos=receiveMessage->getSenderPos();
                                 tempInfo.junctionId=getCurrentJunctionId(receiveMessage->getCurrentRoadId());
+                                tempInfo.macAddr = receiveMessage->getMacAddr();
                                 std::string temp(receiveMessage->getSourceAddress());
                                 std::string destinationTemp("node[" +temp+ "]");
                                 pushVehicleInfo(destinationTemp,tempInfo);
@@ -394,7 +403,7 @@ void SimpleApp::handleMessage(cMessage *msg) {
                             std::cerr<<"GW receive a GW"<<std::endl;
                             //the GW is neighbor GW?
                             std::string roadIdOfGw(receiveMessage->getCurrentRoadId());
-                            if(isNeighborGW( roadIdOfGw, getCurrentRoadId() )) {// behind GW
+                            if(isNeighborGW( roadIdOfGw, getCurrentRoadId())) {// behind GW
                                 //process
                                 double delayTime = getTimeDelay(receiveMessage);
                                 Connectivity_Info tempGwCOnnectivity;
@@ -413,10 +422,11 @@ void SimpleApp::handleMessage(cMessage *msg) {
                             }
                          } else if (receiveMessage->getUsedFor() == BroadcastTopology) {
                              std::cerr<<"# CH receive a msg for topology from another CM /GW #"<<std::endl;
-                             if ((this->topologySet.insert(receiveMessage->getMsgCode())).second) {
+                             if (this->topologySet.count(receiveMessage->getMsgCode()) > 0 ) {
                                  break;
                              } else {
                                  this->infoGwToLte = receiveMessage->getInfoGWToLte();
+                                 this->topologySet.insert(receiveMessage->getMsgCode());
                                  if (isgatewayNode()) { // CM is GW
                                      startBroadcastTopologyInfo(receiveMessage->getMsgCode());
                                  }
@@ -450,8 +460,8 @@ void SimpleApp::handleMessage(cMessage *msg) {
                             }
                          } else if (receiveMessage->getUsedFor() == BroadcastTopology) {
                              std::cerr<<"# CH receive a msg for topology from another CM /GW #"<<std::endl;
-                             if ((this->topologySet.insert(receiveMessage->getMsgCode())).second) {
-                                 break;
+                             if ((this->topologySet.count(receiveMessage->getMsgCode()) > 0 )) {
+
                              } else {
                                  this->infoGwToLte = receiveMessage->getInfoGWToLte();
                                  if (isgatewayNode()) { // CM is GW
@@ -464,7 +474,11 @@ void SimpleApp::handleMessage(cMessage *msg) {
                              } else {
                                  relayRoutingMsg(receiveMessage);
                              }
+                         } else if(receiveMessage->getUsedFor() == ToBeGw) {
+                             this->setGateWayNode(true);
+                             scheduleAt(simTime() + 0.1, new cMessage("Send"));
                          } else {}
+
                         if(findFromCHList(receiveMessage->getCHInfo(),carId)) {//whether the car is a member of cluster
                             std::string receiveCHId(receiveMessage->getSourceAddress());
                             if(memberOfCluster(receiveMessage->getCHRoadID(),getCurrentRoadId())&&(receiveCHId==getCHId())) {//whether can be a member of cluster
@@ -537,7 +551,6 @@ void SimpleApp::handleMessage(cMessage *msg) {
                         setCHId("");
                         startBroadcast(4);
                         scheduleAt(simTime() + 0.1, new cMessage("Send"));
-
                     }
                         break;
                     default:
@@ -554,7 +567,7 @@ void SimpleApp::handleMessage(cMessage *msg) {
                                 tempInfo.nextRoadId = receiveMessage->getNodeNextRoadId();
                                 tempInfo.pos = receiveMessage->getSenderPos();
                                 tempInfo.junctionId = getCurrentJunctionId(receiveMessage->getCurrentRoadId());
-//                                tempInfo.macAddrGW = receiveMessage->getMacAddr();
+                                tempInfo.macAddr = receiveMessage->getMacAddr();
                                 std::string temp(receiveMessage->getSourceAddress());
                                 std::string destinationTemp("node[" +temp+ "]");
                                 pushVehicleInfoCH(destinationTemp,tempInfo);
@@ -573,6 +586,7 @@ void SimpleApp::handleMessage(cMessage *msg) {
                             tempInfo.nextRoadId=receiveMessage->getNodeNextRoadId();
                             tempInfo.pos=receiveMessage->getSenderPos();
                             tempInfo.junctionId=getCurrentJunctionId(receiveMessage->getCurrentRoadId());
+                            tempInfo.macAddr = receiveMessage->getMacAddr();
                             std::string temp(receiveMessage->getSourceAddress());
                             std::string destinationTemp("node[" +temp+ "]");
                             pushVehicleInfoCH(destinationTemp,tempInfo);
@@ -590,20 +604,24 @@ void SimpleApp::handleMessage(cMessage *msg) {
                         std::string roadIdOfGw(receiveMessage->getCurrentRoadId());
                         if (receiveMessage->getGatewayNode() && receiveMessage->getUsedFor() == BuildConnection && (isNeighborGW(roadIdOfGw, getCurrentRoadId()))){
                             //process
-                            double delayTime = getTimeDelay(receiveMessage);
-                            Connectivity_Info tempGwCOnnectivity;
-                            tempGwCOnnectivity.connectivityValue = delayTime / 0.5;
-                            tempGwCOnnectivity.macAddrGW = receiveMessage->getMacAddr();
-                            if (infoGw[getCurrentJunctionId(receiveMessage->getCurrentRoadId())].count(receiveMessage->getCurrentRoadId()) > 0) {
-                                infoGw[getCurrentJunctionId(receiveMessage->getCurrentRoadId())].erase(receiveMessage->getCurrentRoadId());
+                            std::string sForDecide(receiveMessage->getSourceAddress());
+                            std::string carIdForDecide("node[" +sForDecide+ "]");
+                            if ( !findFromCHList(getVehicleInfoOfCluster(),carIdForDecide)) {// GW not a member of cluster
+                                double delayTime = getTimeDelay(receiveMessage);
+                                Connectivity_Info tempGwCOnnectivity;
+                                tempGwCOnnectivity.connectivityValue = delayTime / 0.5;
+                                tempGwCOnnectivity.macAddrGW = receiveMessage->getMacAddr();
+                                if (infoGw[getCurrentJunctionId(receiveMessage->getCurrentRoadId())].count(receiveMessage->getCurrentRoadId()) > 0) {
+                                    infoGw[getCurrentJunctionId(receiveMessage->getCurrentRoadId())].erase(receiveMessage->getCurrentRoadId());
+                                }
+                                std::map<std::string, Connectivity_Info> tempInner;
+                                tempInner.insert(std::make_pair(receiveMessage->getCurrentRoadId(),tempGwCOnnectivity));
+                                infoGw.insert(std::make_pair(getCurrentJunctionId(receiveMessage->getCurrentRoadId()),tempInner));
                             }
-                            std::map<std::string, Connectivity_Info> tempInner;
-                            tempInner.insert(std::make_pair(receiveMessage->getCurrentRoadId(),tempGwCOnnectivity));
-                            infoGw.insert(std::make_pair(getCurrentJunctionId(receiveMessage->getCurrentRoadId()),tempInner));
                         } else if (receiveMessage->getUsedFor() == BroadcastTopology) {
                             std::cerr<<"# CH receive a msg for topology from another CM /GW #"<<std::endl;
                             if ((this->topologySet.insert(receiveMessage->getMsgCode())).second) {
-                                break;
+
                             } else {
                                 this->infoGwToLte = receiveMessage->getInfoGWToLte();
                                 startBroadcastTopologyInfo(receiveMessage->getMsgCode());
@@ -614,8 +632,6 @@ void SimpleApp::handleMessage(cMessage *msg) {
                             } else {
                                 relayRoutingMsg(receiveMessage);
                             }
-                        } else {
-                            break;
                         }
                         std::string s(receiveMessage->getSourceAddress());
                         std::string carId("node[" +s+ "]");
@@ -633,6 +649,7 @@ void SimpleApp::handleMessage(cMessage *msg) {
                                    tempInfo.nextRoadId=receiveMessage->getNodeNextRoadId();
                                    tempInfo.pos=receiveMessage->getSenderPos();
                                    tempInfo.junctionId=getCurrentJunctionId(receiveMessage->getCurrentRoadId());
+                                   tempInfo.macAddr = receiveMessage->getMacAddr();
                                    std::string temp(receiveMessage->getSourceAddress());
                                    std::string destinationTemp("node[" +temp+ "]");
                                    pushVehicleInfoCH(destinationTemp,tempInfo);
@@ -654,6 +671,7 @@ void SimpleApp::handleMessage(cMessage *msg) {
                                tempInfo.nextRoadId=receiveMessage->getNodeNextRoadId();
                                tempInfo.pos=receiveMessage->getSenderPos();
                                tempInfo.junctionId=getCurrentJunctionId(receiveMessage->getCurrentRoadId());
+                               tempInfo.macAddr = receiveMessage->getMacAddr();
                                std::string temp(receiveMessage->getSourceAddress());
                                std::string destinationTemp("node[" +temp+ "]");
                                pushVehicleInfoCH(destinationTemp,tempInfo);
@@ -684,8 +702,6 @@ void SimpleApp::handleMessage(cMessage *msg) {
                                     } else {
                                         relayRoutingMsg(receiveMessage);
                                     }
-                                } else {
-                                    break;
                                 }
                             }
                         }
@@ -741,14 +757,13 @@ void SimpleApp::handleMessage(cMessage *msg) {
                             } else {
                                 relayRoutingMsg(receiveMessage);
                             }
-                        } else {
-                            break;
                         }
                 }
                         break;
                     case 5: {//CH receive a LTE
                         std::cerr<<"# CH receive a msg for topology from LTE #"<<std::endl;
-                        if ((this->topologySet.insert(receiveMessage->getMsgCode())).second) {
+
+                        if ( this->topologySet.count(receiveMessage->getMsgCode()) > 0) {
                             break;
                         } else {
                             this->infoGwToLte = receiveMessage->getInfoGWToLte();
@@ -907,13 +922,13 @@ void SimpleApp::startBroadcast(int msgState)//orginal
     sendMessage->setCurrentRoadId(getCurrentRoadId().c_str());//current road id
     sendMessage->setSenderPos(getCurrentPos(simTime()));//current pos
     sendMessage->setIsBroadcast(true);
-    if(msgState==2)//tempCH broadcast
+    if(msgState == 2)//tempCH broadcast
     {
         Info tempInfo;
-        tempInfo.currentRoadId=getCurrentRoadId();
-        tempInfo.nextRoadId=getNextRoadId(getCurrentRoute(),getCurrentRoadId());
-        tempInfo.pos=getCurrentPos(SimTime());
-        tempInfo.junctionId=getCurrentJunctionId(getCurrentRoadId());
+        tempInfo.currentRoadId = getCurrentRoadId();
+        tempInfo.nextRoadId = getNextRoadId(getCurrentRoute(),getCurrentRoadId());
+        tempInfo.pos = getCurrentPos(SimTime());
+        tempInfo.junctionId = getCurrentJunctionId(getCurrentRoadId());
         std::string destinationTemp("node[" + getSumoId() + "]");
         pushVehicleInfo(destinationTemp,tempInfo);
         sendMessage->setTempCHInfo(getVehicleInfoofTempCluster());
@@ -922,35 +937,29 @@ void SimpleApp::startBroadcast(int msgState)//orginal
         sendMessage->setCH_Speed(getSpeed());
     }
     //CH broadcast
-    if(msgState==4)
+    if(msgState == 4)
     {
         //update CH info
         Info tempInfo;
-        tempInfo.currentRoadId=getCurrentRoadId();
-        tempInfo.nextRoadId=getNextRoadId(getCurrentRoute(),getCurrentRoadId());
-        tempInfo.pos=getCurrentPos(simTime());
-        tempInfo.junctionId=getCurrentJunctionId(getCurrentRoadId());
+        tempInfo.currentRoadId = getCurrentRoadId();
+        tempInfo.nextRoadId = getNextRoadId(getCurrentRoute(),getCurrentRoadId());
+        tempInfo.pos = getCurrentPos(simTime());
+        tempInfo.junctionId = getCurrentJunctionId(getCurrentRoadId());
         std::string destinationTemp("node[" + getSumoId() + "]");
         pushVehicleInfoCH(destinationTemp,tempInfo);
         setClusterQueue(getCurrentRoadId());
-        if(getCurrentRoadId()=="1/0to2/0")
-        {
-            std::cerr<<getCurrentRoadId()<<std::endl;
-        }
         sendMessage->setCHRoadID(getClusterQueue());
         sendMessage->setCHInfo(getVehicleInfoOfCluster());
         sendMessage->setCH_Speed(getSpeed());
+        sendMessage->setInfoGw(infoGw);
+        sendMessage->setGatewayNode(true);
     }
 
     if (isgatewayNode()) {// for CM is a GWs
         //update GWs info
-        Info tempInfo;
-        tempInfo.currentRoadId=getCurrentRoadId();
-        tempInfo.nextRoadId=getNextRoadId(getCurrentRoute(),getCurrentRoadId());
-        tempInfo.pos=getCurrentPos(simTime());
-        tempInfo.junctionId=getCurrentJunctionId(getCurrentRoadId());
-        std::string destinationTemp("node[" + getSumoId() + "]");
         sendMessage->setInfoGw(infoGw);
+        sendMessage->setGatewayNode(true);
+        sendMessage->setUsedFor(BuildConnection);
     }
     countBroadcastNum();
     send(sendMessage, toDecisionMaker);
@@ -1000,10 +1009,10 @@ void SimpleApp::sendToLTE(int msgState)
     serverMessage->setNetworkType(LTE);
     serverMessage->setDestinationAddress("server");
     serverMessage->setSourceAddress(sumoId.c_str());
-    if(msgState==2)
+    if(msgState == 2)
         serverMessage->setTempCHInfo(getVehicleInfoofTempCluster());
     else {
-        serverMessage->setTempCHInfo(getVehicleInfoOfCluster());
+        serverMessage->setCHInfo(getVehicleInfoOfCluster());
         serverMessage->setInfoGWToLte(this->infoGwToLte);
     }
     serverMessage->setMsgState(msgState);
@@ -1072,6 +1081,31 @@ void SimpleApp::startUnicastByGateWay(HeterogeneousMessage *receiveMessage,int m
     std::cerr<<"==========gateway message unicast====================>"<<std::endl;
 }
 
+void SimpleApp::startUnicastToGateWay(std::string GWID) {
+    HeterogeneousMessage *sendMessage = new HeterogeneousMessage();
+    sendMessage->setNetworkType(DSRC);
+    sendMessage->setName("unicast Test Message");
+    sendMessage->setByteLength(10);
+    TraCIScenarioManager* manager = TraCIScenarioManagerAccess().get();
+    std::map<std::string, cModule*> hosts = manager->getManagedHosts();
+    std::map<std::string, cModule*>::iterator it = hosts.begin();
+    std::advance(it, intrand(hosts.size()));
+    std::string temp = getSumoId();
+    std::string destination("node[" +CHId+ "]");
+    sendMessage->setDestinationAddress(destination.c_str());
+    sendMessage->setMsgState(getVehicleState());//message state
+    sendMessage->setIsBroadcast(false);//unicast
+    sendMessage->setMacAddr(GwForCluster[GWID].macAddr);//set mac address
+    sendMessage->setSourceAddress(sumoId.c_str());//source
+    sendMessage->setNodeNextRoadId(getNextRoadId(getCurrentRoute(),getCurrentRoadId()).c_str());//next road id
+    sendMessage->setCurrentRoadId(getCurrentRoadId().c_str());//current road id
+    sendMessage->setSenderPos(getCurrentPos(simTime()));//current pos
+    sendMessage->setUsedFor(ToBeGw);
+    send(sendMessage, toDecisionMaker);
+    unicastNum++;
+    std::cerr<<"==========CH strart to info gateway node====================>"<<std::endl;
+}
+
 void SimpleApp::startUnicastDeparture(LAddress::L2Type macAddr,int msgState,std::string Id_CH)
 {
     HeterogeneousMessage *sendMessage = new HeterogeneousMessage();
@@ -1111,7 +1145,7 @@ int SimpleApp::getVehicleState()
 
 void SimpleApp::findTwoGW(std::map<std::string,Info> tempInfo) {
     /*find self car*/
-    std::string selfCar = getSumoId();
+    std::string selfCar ("node[" +getSumoId()+ "]");
     Info selfInfo;
     selfInfo.pos.x = 0;
     selfInfo.pos.y = 0;
@@ -1128,6 +1162,7 @@ void SimpleApp::findTwoGW(std::map<std::string,Info> tempInfo) {
         if (it_filter->second.nextRoadId == selfInfo.nextRoadId) {
             tempInfoForFind.insert(std::make_pair(it_filter->first, it_filter->second));
         }
+        it_filter++;
     }
     /*find the GWs from the filter set*/
     Coord selfCoorD = selfInfo.pos;
@@ -1158,7 +1193,7 @@ void SimpleApp::findTwoGW(std::map<std::string,Info> tempInfo) {
                 large = tempResult;
                 result.insert(std::make_pair(tempResult,it->first));
             } else if(tempResult < small) {
-                large = tempResult;
+                small = tempResult;
                 result.insert(std::make_pair(tempResult,it->first));
             }
         }
@@ -1517,7 +1552,7 @@ void SimpleApp::startBroadcastTopologyInfo(int code) {
     sendMessage->setCurrentRoadId(getCurrentRoadId().c_str());//current road id
     sendMessage->setSenderPos(getCurrentPos(simTime()));//current pos
     sendMessage->setIsBroadcast(true);
-    if (isgatewayNode()) {// for CM/CH is a GWs
+    if (isgatewayNode() || getVehicleState() == 4) {// for CM/CH is a GWs
         //update GWs info
         Info tempInfo;
         tempInfo.currentRoadId=getCurrentRoadId();
