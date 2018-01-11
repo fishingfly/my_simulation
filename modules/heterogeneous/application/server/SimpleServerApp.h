@@ -71,6 +71,7 @@ class SimpleServerApp: public ApplicationBase {
 		long receivedMessages;
 		bool debug;
 		std::map<std::string,Info> lteDB;
+		std::map<std::string,Info> tempCHInfo;
 		std::map<std::string,Info> CHInfo;
 		RequestRecord reqRecord;
 		std::string maxNextRoadId;
@@ -79,6 +80,7 @@ class SimpleServerApp: public ApplicationBase {
 	    std::vector<std::string> choosedCHs;
 	    int lastCHInfoSize;
 	    bool CHHasChangedRoad;
+	    int uniqueCode;
 
 
 	public:

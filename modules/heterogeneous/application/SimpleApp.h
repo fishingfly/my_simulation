@@ -113,6 +113,7 @@ protected:
 	int broadcastNum;
 	int unicastNum;
 	bool gatewayNode;
+	std::set<std::string> GWTOGWs;
 
 
 protected:
@@ -178,7 +179,7 @@ protected:
 	std::string getCHId();
 
 	int getSpeed();
-	bool isNeighborGW(std::string GWRoadId, std::string selfRoadId);
+	bool isNeighborGW(std::string GWRoadId, std::string selfRoadId, int StateOfNodeReceived);
 
 	void recordMacAddr_CH(LAddress::L2Type temp);
 

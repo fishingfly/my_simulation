@@ -31,6 +31,7 @@ void SimpleServerApp::initialize(int stage){
 	if(stage == 0){
 		debug = par("debug").boolValue();
 		receivedMessages = 0;
+		uniqueCode = 1;
 		manager = TraCIScenarioManagerAccess().get();
         eNodeBMobility = dynamic_cast<MobilityBase*>(
                     getModuleByPath("scenario.eNodeB1")->getSubmodule("mobility")
@@ -48,7 +49,7 @@ void SimpleServerApp::handleMessageWhenUp(cMessage *msg){
 	HeterogeneousMessage* receiveMessage = dynamic_cast<HeterogeneousMessage*>(msg);
 	if(receiveMessage)
 	{
-		std::cerr<<"# LTE has received a message from a CH or tempCH ! #"<<std::endl;
+		std::cerr<<"# LTE has received a message from a CH or tempCH ! #"<<receiveMessage->getSourceAddress()<<std::endl;
 	    receivedMessages++;
 		tempCHMsgToDB(receiveMessage);//UPdate lte DB
 		if(receiveMessage->getMsgState() == 2)
@@ -56,7 +57,7 @@ void SimpleServerApp::handleMessageWhenUp(cMessage *msg){
 	        std::string sourceAddress = gatherFromDB();
 	        if(sourceAddress != "")
 	        {
-	            std::cout << "[SimpleServerApp, " << simTime() << "] Received Heterogeneous Message from " << sourceAddress << std::endl;
+	            std::cerr << "[SimpleServerApp, " << simTime() << "] Received Heterogeneous Message from " << sourceAddress << std::endl;
 	            /*reply a message to vehicle*/
 	            HeterogeneousMessage *reply = new HeterogeneousMessage("Server Reply");
 	            IPv4Address address = manager->getIPAddressForID(sourceAddress);
@@ -81,6 +82,7 @@ void SimpleServerApp::handleMessageWhenUp(cMessage *msg){
             //CLEAR
 		    this->lastCHInfoSize = CHInfo.size();
 		    this->CHHasChangedRoad = false;
+		    this->tempCHInfo.clear();
 		    choosedCHs.clear();
 
 		}
@@ -106,22 +108,25 @@ void SimpleServerApp::tempCHMsgToDB(HeterogeneousMessage* heterogeneousMessage)
     std::map<std::string,Info> tempInfo;
     // update lteDB
     if ((heterogeneousMessage->getTempCHInfo()).size() != 0 && (heterogeneousMessage->getCHInfo()).size() == 0) {
-        tempInfo=heterogeneousMessage->getTempCHInfo();
+        tempInfo = heterogeneousMessage->getTempCHInfo();
+        this->tempCHInfo = tempInfo;
     } else if ((heterogeneousMessage->getCHInfo()).size() != 0){
-        tempInfo=heterogeneousMessage->getCHInfo();
+        tempInfo = heterogeneousMessage->getCHInfo();
         // store CH info for routing
         std::string tempTest(heterogeneousMessage->getSourceAddress());
         std::string nodeName("node[" +tempTest+ "]");
         CHInfo.insert(std::make_pair(tempTest,tempInfo[nodeName]));
+        //need to update CHInfo.some CH has become invalid
+
     }
 
-    std::map<std::string,Info>::iterator it_temp=tempInfo.begin();
+    std::map<std::string,Info>::iterator it_temp = tempInfo.begin();
     //set request
     RequestRecord tempRecord;
-    tempRecord.requestJuctionId=it_temp->second.junctionId;
-    tempRecord.requestCurrentRoadId=it_temp->second.currentRoadId;
+    tempRecord.requestJuctionId = it_temp->second.junctionId;
+    tempRecord.requestCurrentRoadId = it_temp->second.currentRoadId;
     setRequestInfo(tempRecord);//set request over
-    for(;it_temp!=tempInfo.end();it_temp++)
+    for(;it_temp != tempInfo.end();it_temp++)
     {
         if(lteDB.count(it_temp->first)>0)
         {
@@ -168,10 +173,10 @@ std::string SimpleServerApp::gatherFromDB()
             tempMaxNextRoadId = it_numOfNextRoad->first;
         }
     }
-    std::map<std::string,Info>::iterator it_distinguish = lteDB.begin();
+    std::map<std::string,Info>::iterator it_distinguish = this->tempCHInfo.begin();
     std::map<std::string,Info> candidateOfCH;//the candidate of CH
     std::map<std::string,Info> otherCar;// other of current Road
-    for(;it_distinguish != lteDB.end();it_distinguish++)
+    for(;it_distinguish != this->tempCHInfo.end();it_distinguish++)
     {
         if(strcmp(rr.requestCurrentRoadId.c_str(),it_distinguish->second.currentRoadId.c_str())==0)//request road
         {
@@ -411,8 +416,13 @@ void SimpleServerApp::selectCHsAndUnicast() {
             }
         }
     }
-    if (choosedCHs.size() < 3) {
-        std::cerr<<"# something is wrong with choosedCHs for topology info broadcast!"<<std::endl;
+    if (choosedCHs.size() == 0) {
+        std::cerr<<"# something is wrong with choosedCHs for topology info broadcast! and select the CHs with no condition"<<std::endl;
+        it = CHInfo.begin();
+        while( it != CHInfo.end()) {
+            choosedCHs.push_back(it->first);
+            it++;
+        }
     }
 }
 void SimpleServerApp::startMulticastToCHs( int number ) {
@@ -430,6 +440,6 @@ void SimpleServerApp::startMulticastToCHs( int number ) {
 }
 
 int SimpleServerApp::getUniqueCode() {
-    srand((rand())%10);
-    return rand();
+    uniqueCode++;
+    return uniqueCode;
 }
