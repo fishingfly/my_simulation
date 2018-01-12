@@ -39,7 +39,7 @@ struct Info
 };
 
 struct Connectivity_Info {
-	double connectivityValue;
+	int connectivityValue;
 	LAddress::L2Type macAddrGW;
 };
 

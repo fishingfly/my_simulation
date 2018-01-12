@@ -86,9 +86,11 @@ protected:
 	double meanSpeed;
 	int clusterSize;
 	bool hasFindGw;
-	bool isBehindGw;
+	bool hasUpdateGwInfo;
+	int timeGWUpload;
 	simtime_t lastUpdateTime;
 	double lastSpeed;
+	int lastTimeBuildConnection;
 	Coord lastCoorD;
 	std::map<std::string,Info> vehicleInfo;
 	std::map<std::string,Info> vehicleInfoCH;
@@ -142,6 +144,7 @@ protected:
     void addCMcount();
     void setCMcount(int value);
     int getCMcount();
+
 	void startBroadcast(int msgState);
 	void startBroadcastDismiss(int msgState,std::string connectCHId);
 	void sendToLTE(int msgState);
@@ -149,6 +152,7 @@ protected:
 	void startUnicastByGateWay(HeterogeneousMessage *receiveMessage,int msgState);
 	void startUnicastToGateWay(std::string GWID);
 	void startUnicastDeparture(LAddress::L2Type macAddr,int msgState,std::string Id_CH);
+
 	void setVehicleState(int value);
 	int getVehicleState();
 	void findTwoGW(std::map<std::string,Info> tempInfo);
@@ -156,7 +160,7 @@ protected:
 	double getEffictiveTime();
 	double getDistanceToIntersection();
 	void updateRecordLastTime();
-	double getTimeDelay(HeterogeneousMessage *receiveMessage);
+	int getTimeDelay(HeterogeneousMessage *receiveMessage);
 
 	void pushVehicleInfo(std::string carId,Info carInfo);
 	std::map<std::string,Info> getVehicleInfoofTempCluster();
