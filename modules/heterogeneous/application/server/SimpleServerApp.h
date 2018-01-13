@@ -118,7 +118,7 @@ class SimpleServerApp: public ApplicationBase {
 		void startMulticastToCHs(int number);
 		int getUniqueCode();
 
-
+		void clearExpiredDataForGW();//wait to  do
 };
 
 #endif /* SIMPLESERVER_H_ */

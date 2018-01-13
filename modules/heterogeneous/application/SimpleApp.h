@@ -183,6 +183,7 @@ protected:
 	std::string getCHId();
 
 	int getSpeed();
+	double computeDis(Coord pos1,Coord pos2);
 	bool isNeighborGW(std::string GWRoadId, std::string selfRoadId, int StateOfNodeReceived);
 
 	void recordMacAddr_CH(LAddress::L2Type temp);
@@ -199,7 +200,7 @@ protected:
     void startBroadcastTopologyInfo(int code);
     void relayRoutingMsg(HeterogeneousMessage *receiveMessage);
     void findRoutePath( std::vector<Connectivity_Info> onePath, double conenctivity_value,int currentHop, std::string roadIdSourceNode, std::string targetIntersectionId);
-
+    std::vector<std::string> findTwoIntersection(Coord selfPos);
 
 	//record date
 	void insertCH_Id(std::string carId);

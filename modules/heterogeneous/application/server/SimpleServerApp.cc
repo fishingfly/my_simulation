@@ -73,7 +73,10 @@ void SimpleServerApp::handleMessageWhenUp(cMessage *msg){
             selectCHsAndUnicast();
 		    //multicast by condition
 		    if ((!hasBroadcast && CHInfo.size() == this->lastCHInfoSize) || (this->CHHasChangedRoad) ) {
-		       if (((this->infoGWToLte).size() > 0)) {
+		       if ((this->infoGWToLte).size() > 0) {
+		           if ((this->infoGWToLte).size() > 2) {
+		               std::cout<<"sad"<<std::endl;
+		           }
 		           std::cout<<(this->infoGWToLte).size()<<std::endl;
                    startMulticastToCHs(getUniqueCode());
                    this->hasBroadcast = true;
@@ -134,6 +137,8 @@ void SimpleServerApp::tempCHMsgToDB(HeterogeneousMessage* heterogeneousMessage)
                 this->CHHasChangedRoad = true;
             }
             lteDB.erase(it_temp->first);
+        } else {
+            this->CHHasChangedRoad = true;
         }
         lteDB.insert(std::pair<std::string,Info>(it_temp->first,it_temp->second));
     }
@@ -442,4 +447,8 @@ void SimpleServerApp::startMulticastToCHs( int number ) {
 int SimpleServerApp::getUniqueCode() {
     uniqueCode++;
     return uniqueCode;
+}
+
+void SimpleServerApp::clearExpiredDataForGW() {
+
 }

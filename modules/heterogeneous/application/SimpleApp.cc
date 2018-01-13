@@ -154,9 +154,7 @@ void SimpleApp::handleMessage(cMessage *msg) {
             if(getCHCount() > 20) {
                 //package GWInfoToLte
                 if ((this->infoGwToLte).size() > 0) {
-                    if (this->hasUpdateGwInfo) {
-                        sendToLTE(getVehicleState());
-                    }
+                    sendToLTE(getVehicleState());
                 }
                 setCHCount(0);
             }
@@ -185,6 +183,17 @@ void SimpleApp::handleMessage(cMessage *msg) {
             } else {
                 clusterSize = vehicleInfoCH.size();
             }
+
+            //test routing
+            if (int(simTime().dbl()) > 139 ) {
+                std::vector<Connectivity_Info> onePath;
+                std::vector<std::string> targetIntersectionId = findTwoIntersection(this->getCurrentPos(simTime()));
+
+                findRoutePath( onePath, 0, 0, "1/3to1/2", "1/1");
+                std::cout<<"OK"<<std::endl;
+            }
+
+            //end test routing
             scheduleAt(simTime() + 0.2, new cMessage("Send"));
         }
             break;
@@ -423,16 +432,11 @@ void SimpleApp::handleMessage(cMessage *msg) {
                                 Connectivity_Info tempGwCOnnectivity;
                                 tempGwCOnnectivity.connectivityValue = delayTime;
                                 tempGwCOnnectivity.macAddrGW = receiveMessage->getMacAddr();
-                                if (infoGw[getCurrentJunctionId(receiveMessage->getCurrentRoadId())].count(receiveMessage->getCurrentRoadId()) > 0) {
-                                    infoGw[getCurrentJunctionId(receiveMessage->getCurrentRoadId())].erase(receiveMessage->getCurrentRoadId());
+                                if (infoGw[getLastJunctionId(receiveMessage->getCurrentRoadId())].count(receiveMessage->getCurrentRoadId()) > 0) {
+                                    infoGw[getLastJunctionId(receiveMessage->getCurrentRoadId())].erase(receiveMessage->getCurrentRoadId());
                                 }
-                                std::map<std::string, Connectivity_Info> tempInner;
-                                tempInner.insert(std::make_pair(receiveMessage->getCurrentRoadId(),tempGwCOnnectivity));
-                                infoGw.insert(std::make_pair(getCurrentJunctionId(receiveMessage->getCurrentRoadId()),tempInner));
-                                // send to CH;
-                                startUnicastByGateWay(receiveMessage,getVehicleState());
-                                // self message by period time for other GW message, time needs to be dynamic
-//                                scheduleAt(simTime() + 5, new cMessage("Send"));
+                                this->infoGw[getLastJunctionId(receiveMessage->getCurrentRoadId())].insert(std::make_pair(receiveMessage->getCurrentRoadId(), tempGwCOnnectivity));
+                                std::cout<<receiveMessage->getSourceAddress()<<"==>"<<getSumoId()<<std::endl;
                             }
                          } else if (receiveMessage->getUsedFor() == BroadcastTopology) {
                              std::cerr<<"# CH receive a msg for topology from another CM /GW #"<<std::endl;
@@ -473,12 +477,10 @@ void SimpleApp::handleMessage(cMessage *msg) {
                                 Connectivity_Info tempGwCOnnectivity;
                                 tempGwCOnnectivity.connectivityValue = delayTime;
                                 tempGwCOnnectivity.macAddrGW = receiveMessage->getMacAddr();
-                                if (infoGw[getCurrentJunctionId(receiveMessage->getCurrentRoadId())].size() > 0) {
-                                    infoGw.erase(getCurrentJunctionId(receiveMessage->getCurrentRoadId()));
+                                if (this->infoGw[getCurrentJunctionId(receiveMessage->getCurrentRoadId())].count(receiveMessage->getCurrentRoadId()) > 0) {
+                                    this->infoGw[getCurrentJunctionId(receiveMessage->getCurrentRoadId())].erase(receiveMessage->getCurrentRoadId());
                                 }
-                                std::map<std::string, Connectivity_Info> tempInner;
-                                tempInner.insert(std::make_pair(receiveMessage->getCurrentRoadId(),tempGwCOnnectivity));
-                                infoGw[getCurrentJunctionId(receiveMessage->getCurrentRoadId())] = tempInner;
+                                this->infoGw[getCurrentJunctionId(receiveMessage->getCurrentRoadId())].insert(std::make_pair(receiveMessage->getCurrentRoadId(), tempGwCOnnectivity));
                                 std::cout<<receiveMessage->getSourceAddress()<<"==>"<<getSumoId()<<std::endl;
                             }
                          } else if (receiveMessage->getUsedFor() == BroadcastTopology) {
@@ -639,14 +641,21 @@ void SimpleApp::handleMessage(cMessage *msg) {
                                 Connectivity_Info tempGwConnectivity;
                                 tempGwConnectivity.connectivityValue = delayTime;
                                 tempGwConnectivity.macAddrGW = receiveMessage->getMacAddr();
-                                this->infoGwToLte[getCurrentRoadId()][getCurrentJunctionId(getCurrentRoadId())][receiveMessage->getCurrentRoadId()].connectivityValue = tempGwConnectivity.connectivityValue;
-                                this->infoGwToLte[getCurrentRoadId()][getCurrentJunctionId(getCurrentRoadId())][receiveMessage->getCurrentRoadId()].macAddrGW = tempGwConnectivity.macAddrGW;
-                                this->hasUpdateGwInfo = true;
+                                if (tempGwConnectivity.connectivityValue > 0) {
+                                    if (this->infoGwToLte[getCurrentRoadId()][getCurrentJunctionId(getCurrentRoadId())].count(receiveMessage->getCurrentRoadId()) > 0) {
+                                        this->infoGwToLte[getCurrentRoadId()][getCurrentJunctionId(getCurrentRoadId())].erase(receiveMessage->getCurrentRoadId());
+                                    }
+                                    this->infoGwToLte[getCurrentRoadId()][getCurrentJunctionId(getCurrentRoadId())].insert(std::make_pair(receiveMessage->getCurrentRoadId(), tempGwConnectivity));
+                                    this->hasUpdateGwInfo = true;
+                                }
                             } else if (findFromCHList(getVehicleInfoOfCluster(),carIdForDecide)){
                                 this->timeGWUpload = int(SimTime().dbl());// for record upload time
                                 std::map<std::string, std::map<std::string, Connectivity_Info>> tempInner = receiveMessage->getInfoGw();
                                 if (tempInner.size() > 0 && tempInner[getLastJunctionId(receiveMessage->getCurrentRoadId())].size() > 0) {
-                                    this->infoGwToLte[getCurrentRoadId()][getLastJunctionId(receiveMessage->getCurrentRoadId())][receiveMessage->getCurrentRoadId()] = tempInner[getLastJunctionId(receiveMessage->getCurrentRoadId())][receiveMessage->getCurrentRoadId()];
+                                    if (this->infoGwToLte[getCurrentRoadId()].count(getLastJunctionId(receiveMessage->getCurrentRoadId())) > 0) {
+                                        this->infoGwToLte[getCurrentRoadId()].erase(getLastJunctionId(receiveMessage->getCurrentRoadId()));
+                                    }
+                                    this->infoGwToLte[getCurrentRoadId()].insert(std::make_pair(getLastJunctionId(receiveMessage->getCurrentRoadId()), tempInner[getLastJunctionId(receiveMessage->getCurrentRoadId())]));
                                     this->hasUpdateGwInfo = true;
                                 }
                             }
@@ -1653,11 +1662,11 @@ void SimpleApp::findRoutePath( std::vector<Connectivity_Info> onePath, double co
         std::map<std::string, Connectivity_Info>::iterator it_temp = connectionData.begin();
         while (it_temp != connectionData.end()) {// the road connected to the target intersection ID
             onePath.push_back(it_temp->second);
-            double new_conenctivity_value = conenctivity_value;
-            new_conenctivity_value = ((it_temp->second).connectivityValue) < conenctivity_value ? ((it_temp->second).connectivityValue) : conenctivity_value;
-            routeForSelected.insert(std::make_pair(new_conenctivity_value, onePath));
+            conenctivity_value += ((it_temp->second).connectivityValue);
+            this->routeForSelected.insert(std::make_pair(conenctivity_value, onePath));
             //erase
             onePath.pop_back();
+            conenctivity_value -= ((it_temp->second).connectivityValue);
             it_temp++;
         }
         return;
@@ -1668,17 +1677,60 @@ void SimpleApp::findRoutePath( std::vector<Connectivity_Info> onePath, double co
         std::map<std::string, Connectivity_Info>::iterator it_temp = connectionData.begin();
         while (it_temp != connectionData.end()) {// the road connected to the target intersection ID
             onePath.push_back(it_temp->second);
-            double new_conenctivity_value = conenctivity_value;
-            new_conenctivity_value = ((it_temp->second).connectivityValue) < conenctivity_value ? ((it_temp->second).connectivityValue) : conenctivity_value;
+            conenctivity_value += ((it_temp->second).connectivityValue);
             currentHop++;
-            findRoutePath(onePath, new_conenctivity_value, currentHop, it_temp->first, targetIntersectionId);
+            findRoutePath(onePath, conenctivity_value, currentHop, it_temp->first, targetIntersectionId);
             //erase
             currentHop--;
+            conenctivity_value -= ((it_temp->second).connectivityValue);
             onePath.pop_back();
             it_temp++;
         }
+        it++;
     }
 }
+
+double SimpleApp::computeDis(Coord pos1,Coord pos2)
+{
+    double dis=sqrt((pos1.x-pos2.x)*(pos1.x-pos2.x)+((pos1.y-pos2.y))*((pos1.y-pos2.y)));
+    return dis;
+}
+
+std::vector<std::string> SimpleApp::findTwoIntersection(Coord selfPos) {
+    // find the first closest intersection
+    std::vector<std::string> result;
+    std::map<int, std::string> distanceToIntersections;
+    std::map<std::string, Coord>::iterator it_map =  electricMap.begin();
+    int resultFirst = 20000;
+    bool twoIntersectionSameDis = false;
+    while(it_map != electricMap.end()) {
+        int distance = int(computeDis(selfPos,it_map->second));
+        resultFirst = resultFirst < distance ? resultFirst : distance;
+        if(distanceToIntersections.count(distance) > 0) {
+            result.push_back(it_map->first);
+            twoIntersectionSameDis = true;
+        } else {
+            distanceToIntersections.insert(std::make_pair(distance, it_map->first));
+        }
+        it_map++;
+    }
+    //find the second;
+    result.push_back(distanceToIntersections[resultFirst]);
+    if (!twoIntersectionSameDis) {
+        distanceToIntersections.erase(resultFirst);
+        std::map<int, std::string>::iterator it_second = distanceToIntersections.begin();
+        int resultSecond = 200000;
+        while(it_second != distanceToIntersections.end()) {
+            resultSecond = resultSecond < it_second->first ? resultSecond : it_second->first;
+            it_second++;
+        }
+        result.push_back(distanceToIntersections[resultSecond]);
+    } else {
+        return result;
+    }
+    // find the second closest intersection
+}
+
 
 void SimpleApp::finish(){
     std::set<std::string>::iterator it_forGW = GWTOGWs.begin();
