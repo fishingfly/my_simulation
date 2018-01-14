@@ -80,6 +80,7 @@ WaveShortMessage::WaveShortMessage(const char *name, int kind) : ::cPacket(name,
     this->gatewayNode_var = 0;
     this->msgCode_var = 0;
     this->usedFor_var = 0;
+    this->routingStartTime_var = 0;
 }
 
 WaveShortMessage::WaveShortMessage(const WaveShortMessage& other) : ::cPacket(other)
@@ -133,6 +134,7 @@ void WaveShortMessage::copy(const WaveShortMessage& other)
     this->msgCode_var = other.msgCode_var;
     this->usedFor_var = other.usedFor_var;
     this->routeTable_var = other.routeTable_var;
+    this->routingStartTime_var = other.routingStartTime_var;
 }
 
 void WaveShortMessage::parsimPack(cCommBuffer *b)
@@ -170,6 +172,7 @@ void WaveShortMessage::parsimPack(cCommBuffer *b)
     doPacking(b,this->msgCode_var);
     doPacking(b,this->usedFor_var);
     doPacking(b,this->routeTable_var);
+    doPacking(b,this->routingStartTime_var);
 }
 
 void WaveShortMessage::parsimUnpack(cCommBuffer *b)
@@ -207,6 +210,7 @@ void WaveShortMessage::parsimUnpack(cCommBuffer *b)
     doUnpacking(b,this->msgCode_var);
     doUnpacking(b,this->usedFor_var);
     doUnpacking(b,this->routeTable_var);
+    doUnpacking(b,this->routingStartTime_var);
 }
 
 int WaveShortMessage::getWsmVersion() const
@@ -529,6 +533,16 @@ void WaveShortMessage::setRouteTable(const RouteTable& routeTable)
     this->routeTable_var = routeTable;
 }
 
+double WaveShortMessage::getRoutingStartTime() const
+{
+    return routingStartTime_var;
+}
+
+void WaveShortMessage::setRoutingStartTime(double routingStartTime)
+{
+    this->routingStartTime_var = routingStartTime;
+}
+
 class WaveShortMessageDescriptor : public cClassDescriptor
 {
   public:
@@ -576,7 +590,7 @@ const char *WaveShortMessageDescriptor::getProperty(const char *propertyname) co
 int WaveShortMessageDescriptor::getFieldCount(void *object) const
 {
     cClassDescriptor *basedesc = getBaseClassDescriptor();
-    return basedesc ? 32+basedesc->getFieldCount(object) : 32;
+    return basedesc ? 33+basedesc->getFieldCount(object) : 33;
 }
 
 unsigned int WaveShortMessageDescriptor::getFieldTypeFlags(void *object, int field) const
@@ -620,8 +634,9 @@ unsigned int WaveShortMessageDescriptor::getFieldTypeFlags(void *object, int fie
         FD_ISEDITABLE,
         FD_ISEDITABLE,
         FD_ISCOMPOUND,
+        FD_ISEDITABLE,
     };
-    return (field>=0 && field<32) ? fieldTypeFlags[field] : 0;
+    return (field>=0 && field<33) ? fieldTypeFlags[field] : 0;
 }
 
 const char *WaveShortMessageDescriptor::getFieldName(void *object, int field) const
@@ -665,8 +680,9 @@ const char *WaveShortMessageDescriptor::getFieldName(void *object, int field) co
         "msgCode",
         "usedFor",
         "routeTable",
+        "routingStartTime",
     };
-    return (field>=0 && field<32) ? fieldNames[field] : NULL;
+    return (field>=0 && field<33) ? fieldNames[field] : NULL;
 }
 
 int WaveShortMessageDescriptor::findField(void *object, const char *fieldName) const
@@ -705,6 +721,7 @@ int WaveShortMessageDescriptor::findField(void *object, const char *fieldName) c
     if (fieldName[0]=='m' && strcmp(fieldName, "msgCode")==0) return base+29;
     if (fieldName[0]=='u' && strcmp(fieldName, "usedFor")==0) return base+30;
     if (fieldName[0]=='r' && strcmp(fieldName, "routeTable")==0) return base+31;
+    if (fieldName[0]=='r' && strcmp(fieldName, "routingStartTime")==0) return base+32;
     return basedesc ? basedesc->findField(object, fieldName) : -1;
 }
 
@@ -749,8 +766,9 @@ const char *WaveShortMessageDescriptor::getFieldTypeString(void *object, int fie
         "int",
         "int",
         "RouteTable",
+        "double",
     };
-    return (field>=0 && field<32) ? fieldTypeStrings[field] : NULL;
+    return (field>=0 && field<33) ? fieldTypeStrings[field] : NULL;
 }
 
 const char *WaveShortMessageDescriptor::getFieldProperty(void *object, int field, const char *propertyname) const
@@ -822,6 +840,7 @@ std::string WaveShortMessageDescriptor::getFieldAsString(void *object, int field
         case 29: return long2string(pp->getMsgCode());
         case 30: return long2string(pp->getUsedFor());
         case 31: {std::stringstream out; out << pp->getRouteTable(); return out.str();}
+        case 32: return double2string(pp->getRoutingStartTime());
         default: return "";
     }
 }
@@ -859,6 +878,7 @@ bool WaveShortMessageDescriptor::setFieldAsString(void *object, int field, int i
         case 26: pp->setGatewayNode(string2bool(value)); return true;
         case 29: pp->setMsgCode(string2long(value)); return true;
         case 30: pp->setUsedFor(string2long(value)); return true;
+        case 32: pp->setRoutingStartTime(string2double(value)); return true;
         default: return false;
     }
 }

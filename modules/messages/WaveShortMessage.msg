@@ -43,6 +43,7 @@ struct Info
     std::string currentRoadId;
     std::string junctionId;
     Coord pos;
+    LAddress::L2Type macAddr;
 };
 
 struct Connectivity_Info {
@@ -108,4 +109,5 @@ packet WaveShortMessage {
 	int msgCode;
 	int usedFor;
 	RouteTable routeTable;
+	double routingStartTime;
 }

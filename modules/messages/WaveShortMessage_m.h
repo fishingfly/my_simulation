@@ -39,7 +39,7 @@ struct Info
 };
 
 struct Connectivity_Info {
-	int connectivityValue;
+	double connectivityValue;
 	LAddress::L2Type macAddrGW;
 };
 
@@ -50,7 +50,7 @@ typedef std::vector<Connectivity_Info> RouteTable;
 // }}
 
 /**
- * Class generated from <tt>veins/modules/messages/WaveShortMessage.msg:67</tt> by nedtool.
+ * Class generated from <tt>veins/modules/messages/WaveShortMessage.msg:68</tt> by nedtool.
  * <pre>
  * packet WaveShortMessage
  * {
@@ -97,6 +97,7 @@ typedef std::vector<Connectivity_Info> RouteTable;
  *     int msgCode;
  *     int usedFor;
  *     RouteTable routeTable;
+ *     double routingStartTime;
  * }
  * </pre>
  */
@@ -135,6 +136,7 @@ class WaveShortMessage : public ::cPacket
     int msgCode_var;
     int usedFor_var;
     RouteTable routeTable_var;
+    double routingStartTime_var;
 
   private:
     void copy(const WaveShortMessage& other);
@@ -226,6 +228,8 @@ class WaveShortMessage : public ::cPacket
     virtual RouteTable& getRouteTable();
     virtual const RouteTable& getRouteTable() const {return const_cast<WaveShortMessage*>(this)->getRouteTable();}
     virtual void setRouteTable(const RouteTable& routeTable);
+    virtual double getRoutingStartTime() const;
+    virtual void setRoutingStartTime(double routingStartTime);
 };
 
 inline void doPacking(cCommBuffer *b, WaveShortMessage& obj) {obj.parsimPack(b);}

@@ -54,6 +54,9 @@ enum NodeState
 #define BroadcastTopology 2
 #define RelayRoute 3
 #define ToBeGw 4
+#define BroadcastToDestination 5
+
+#define routeDelayIniValue 100000
 
 struct CH_Rocord
 {
@@ -92,10 +95,12 @@ protected:
 	double lastSpeed;
 	int lastTimeBuildConnection;
 	Coord lastCoorD;
+	int smallestDelayForRoute;
 	std::map<std::string,Info> vehicleInfo;
 	std::map<std::string,Info> vehicleInfoCH;
 	std::queue<std::string> clusterQueue;
 	std::queue<std::string> tempClusterQueue;
+	bool hasSelectedRoute;
 
 
 	InfoGW infoGw;
@@ -106,6 +111,7 @@ protected:
 
 	std::map<double, std::vector<Connectivity_Info>> routeForSelected;
 	std::vector<Connectivity_Info> routeTable;
+	std::string route_destination;
 
 	//record DATA
 	int overHead_clustering;
@@ -151,6 +157,7 @@ protected:
 	void startUnicast(HeterogeneousMessage *receiveMessage,int msgState);
 	void startUnicastByGateWay(HeterogeneousMessage *receiveMessage,int msgState);
 	void startUnicastToGateWay(std::string GWID);
+	void startUnicastToDestination(LAddress::L2Type macAddr, std::string nodeId);
 	void startUnicastDeparture(LAddress::L2Type macAddr,int msgState,std::string Id_CH);
 
 	void setVehicleState(int value);
@@ -189,6 +196,7 @@ protected:
 	void recordMacAddr_CH(LAddress::L2Type temp);
 
 	LAddress::L2Type getMacAddr_CH();
+	bool junctionIDInRoadId(std::string roadId, std::string junctionId);
 
     bool isgatewayNode();
     void setGateWayNode(bool temp);
@@ -201,6 +209,8 @@ protected:
     void relayRoutingMsg(HeterogeneousMessage *receiveMessage);
     void findRoutePath( std::vector<Connectivity_Info> onePath, double conenctivity_value,int currentHop, std::string roadIdSourceNode, std::string targetIntersectionId);
     std::vector<std::string> findTwoIntersection(Coord selfPos);
+    void startRouting();
+    void startBroadcastToDestination(HeterogeneousMessage *receiveMessage);
 
 	//record date
 	void insertCH_Id(std::string carId);

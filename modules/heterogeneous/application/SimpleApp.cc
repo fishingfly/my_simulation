@@ -38,7 +38,9 @@ void SimpleApp::initialize(int stage) {
 		clusterSize = 0;
 		lastTimeBuildConnection = 0;
 		timeGWUpload = 0;
+		smallestDelayForRoute = 100000;
 		hasUpdateGwInfo = false;
+		hasSelectedRoute = false;
         Coord coorTemp;
         coorTemp.x = 0;
         coorTemp.y = 0;
@@ -185,12 +187,21 @@ void SimpleApp::handleMessage(cMessage *msg) {
             }
 
             //test routing
-            if (int(simTime().dbl()) > 139 ) {
+            if (int(simTime().dbl()) > 139 && !(this->hasSelectedRoute) && this->getCurrentRoadId() == "1/3to1/2") {
                 std::vector<Connectivity_Info> onePath;
-                std::vector<std::string> targetIntersectionId = findTwoIntersection(this->getCurrentPos(simTime()));
-
-                findRoutePath( onePath, 0, 0, "1/3to1/2", "1/1");
+                Coord destination;
+                destination.x = 300;
+                destination.y = 100;
+                std::vector<std::string> targetIntersectionId = findTwoIntersection(destination);
+                findRoutePath( onePath, 0, 0, "1/3to1/2", targetIntersectionId[0]);
+                if (this->smallestDelayForRoute == routeDelayIniValue) {
+                    findRoutePath( onePath, 0, 0, "1/3to1/2", targetIntersectionId[1]);
+                }
+                this->routeTable = routeForSelected[this->smallestDelayForRoute];
+                this->route_destination = "flow1.3";
+                startRouting();
                 std::cout<<"OK"<<std::endl;
+                this->hasSelectedRoute = true;
             }
 
             //end test routing
@@ -451,9 +462,22 @@ void SimpleApp::handleMessage(cMessage *msg) {
                              }
                          } else if (receiveMessage->getUsedFor() == RelayRoute) {
                              if (receiveMessage->getRouteTable().size() == 0) {
-                                 std::cerr<<"^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^the routing packet has been received success!!"<<std::endl;
+                                 std::string routeDestination(receiveMessage->getDestinationAddress());
+                                 if (routeDestination.find(this->getSumoId()) != std::string::npos) {
+                                     std::cerr<<"^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^the routing packet has been received success!!"<<std::endl;
+                                 } else {
+                                     // broadcast to find
+                                     startBroadcastToDestination(receiveMessage);
+                                 }
                              } else {
                                  relayRoutingMsg(receiveMessage);
+                             }
+                         } else if (receiveMessage->getUsedFor() == BroadcastToDestination){
+                             std::string tempName(receiveMessage->getDestinationAddress());
+                             if (tempName.find(this->getSumoId()) != std::string::npos) {
+                                 std::cerr<<"successfully routing"<<std::endl;
+                             } else {
+                                 std::cout<<"not the destination"<<std::endl;
                              }
                          } else {}
 
@@ -496,13 +520,26 @@ void SimpleApp::handleMessage(cMessage *msg) {
                              }
                          } else if (receiveMessage->getUsedFor() == RelayRoute) {
                              if (receiveMessage->getRouteTable().size() == 0) {
-                                 std::cerr<<"^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^the routing packet has been received success!!"<<std::endl;
+                                 std::string routeDestination(receiveMessage->getDestinationAddress());
+                                 if (routeDestination.find(this->getSumoId()) != std::string::npos) {
+                                     std::cerr<<"^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^the routing packet has been received success!!"<<std::endl;
+                                 } else {
+                                     // broadcast to find
+                                     startBroadcastToDestination(receiveMessage);
+                                 }
                              } else {
                                  relayRoutingMsg(receiveMessage);
                              }
                          } else if(receiveMessage->getUsedFor() == ToBeGw) {
                              this->setGateWayNode(true);
                              scheduleAt(simTime() + 0.1, new cMessage("Send"));
+                         } else if (receiveMessage->getUsedFor() == BroadcastToDestination){
+                             std::string tempName(receiveMessage->getDestinationAddress());
+                             if (tempName.find(this->getSumoId()) != std::string::npos) {
+                                 std::cerr<<"successfully routing"<<std::endl;
+                             } else {
+                                 std::cout<<"not the destination"<<std::endl;
+                             }
                          } else {}
 
                         if(findFromCHList(receiveMessage->getCHInfo(),carId)) {//whether the car is a member of cluster
@@ -628,10 +665,10 @@ void SimpleApp::handleMessage(cMessage *msg) {
                     case 3://CH receive a CM
                     {
                         std::string roadIdOfGw(receiveMessage->getCurrentRoadId());
+                        std::string sForDecide(receiveMessage->getSourceAddress());
+                        std::string carIdForDecide("node[" +sForDecide+ "]");
                         if (receiveMessage->getGatewayNode() && receiveMessage->getUsedFor() == BuildConnection ){
                             //process
-                            std::string sForDecide(receiveMessage->getSourceAddress());
-                            std::string carIdForDecide("node[" +sForDecide+ "]");
                             std::cout<<receiveMessage->getSourceAddress()<<"==>"<<getSumoId()<<std::endl;
                             if ( !findFromCHList(getVehicleInfoOfCluster(),carIdForDecide) && (isNeighborGW(roadIdOfGw, getCurrentRoadId(), receiveMessage->getMsgState()))) {// GW not a member of cluster
                                 std::cout<<receiveMessage->getSourceAddress()<<"==>"<<getSumoId()<<std::endl;
@@ -650,6 +687,13 @@ void SimpleApp::handleMessage(cMessage *msg) {
                                 }
                             } else if (findFromCHList(getVehicleInfoOfCluster(),carIdForDecide)){
                                 this->timeGWUpload = int(SimTime().dbl());// for record upload time
+                                std::cout<<receiveMessage->getSourceAddress()<<"==>"<<getSumoId()<<std::endl;
+                                std::string nameSou(receiveMessage->getSourceAddress());
+                                GWTOGWs.insert(nameSou+"==>"+getSumoId());
+                                int delayTime = getTimeDelay(receiveMessage);
+                                Connectivity_Info tempGwConnectivity;
+                                tempGwConnectivity.connectivityValue = delayTime;
+                                tempGwConnectivity.macAddrGW = receiveMessage->getMacAddr();
                                 std::map<std::string, std::map<std::string, Connectivity_Info>> tempInner = receiveMessage->getInfoGw();
                                 if (tempInner.size() > 0 && tempInner[getLastJunctionId(receiveMessage->getCurrentRoadId())].size() > 0) {
                                     if (this->infoGwToLte[getCurrentRoadId()].count(getLastJunctionId(receiveMessage->getCurrentRoadId())) > 0) {
@@ -670,9 +714,26 @@ void SimpleApp::handleMessage(cMessage *msg) {
                             }
                         } else if (receiveMessage->getUsedFor() == RelayRoute) {
                             if (receiveMessage->getRouteTable().size() == 0) {
-                                std::cerr<<"^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^the routing packet has been received success!!"<<std::endl;
+                                std::string routeDestination(receiveMessage->getDestinationAddress());
+                                if (routeDestination.find(this->getSumoId()) != std::string::npos) {
+                                    std::cerr<<"^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^the routing packet has been received success!!"<<std::endl;
+                                } else if (findFromCHList(getVehicleInfoOfCluster(),carIdForDecide)) {
+                                    startUnicastToDestination(getVehicleInfoOfCluster()[routeDestination].macAddr, receiveMessage->getDestinationAddress());
+                                } else if (findFromCHList(getVehicleInfoOfCluster(),routeDestination)) {
+                                    startUnicastToDestination(getVehicleInfoOfCluster()[routeDestination].macAddr, receiveMessage->getDestinationAddress());
+                                } else {
+                                    // broadcast to find
+                                    startBroadcastToDestination(receiveMessage);
+                                }
                             } else {
                                 relayRoutingMsg(receiveMessage);
+                            }
+                        } else if (receiveMessage->getUsedFor() == BroadcastToDestination){
+                            std::string tempName(receiveMessage->getDestinationAddress());
+                            if (tempName.find(this->getSumoId()) != std::string::npos) {
+                                std::cerr<<"successfully routing"<<std::endl;
+                            } else {
+                                std::cout<<"not the destination"<<std::endl;
                             }
                         }
                         std::string s(receiveMessage->getSourceAddress());
@@ -767,9 +828,24 @@ void SimpleApp::handleMessage(cMessage *msg) {
                             }
                         } else if (receiveMessage->getUsedFor() == RelayRoute) {
                             if (receiveMessage->getRouteTable().size() == 0) {
-                                std::cerr<<"^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^the routing packet has been received success!!"<<std::endl;
+                                std::string routeDestination(receiveMessage->getDestinationAddress());
+                                if (routeDestination.find(this->getSumoId()) != std::string::npos) {
+                                    std::cerr<<"^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^the routing packet has been received success!!"<<std::endl;
+                                } else {
+                                    //broadcast
+                                    startBroadcastToDestination(receiveMessage);
+                                }
                             } else {
                                 relayRoutingMsg(receiveMessage);
+                            }
+                        } else if (receiveMessage->getUsedFor() == BroadcastToDestination){
+                            std::string tempName(receiveMessage->getDestinationAddress());
+                            if (tempName.find(this->getSumoId()) != std::string::npos) {
+                                std::cerr<<"successfully routing"<<std::endl;
+                            } else if (findFromCHList(getVehicleInfoOfCluster(),tempName)) {
+                                startUnicastToDestination(getVehicleInfoOfCluster()[tempName].macAddr, tempName);
+                            } else {
+                                std::cout<<"not the destination"<<std::endl;
                             }
                         }
                 }
@@ -1128,8 +1204,27 @@ void SimpleApp::startUnicastToGateWay(std::string GWID) {
     send(sendMessage, toDecisionMaker);
     sendMessage->setSendingTime(simTime());
     unicastNum++;
-    std::cerr<<"==========CH strart to info gateway node====================>"<<std::endl;
+    std::cerr<<"==========CH start to info gateway node====================>"<<std::endl;
 }
+
+void SimpleApp::startUnicastToDestination(LAddress::L2Type macAddr, std::string nodeId) {
+    HeterogeneousMessage *sendMessage = new HeterogeneousMessage();
+    sendMessage->setNetworkType(DSRC);
+    sendMessage->setName("unicast Test Message");
+    sendMessage->setByteLength(10);
+    sendMessage->setDestinationAddress(nodeId.c_str());
+    sendMessage->setMsgState(this->getVehicleState());//message state
+    sendMessage->setSendingTime(simTime());
+    sendMessage->setIsBroadcast(false);//unicast
+    sendMessage->setMacAddr(macAddr);//set mac address
+    sendMessage->setSourceAddress(sumoId.c_str());//source
+    sendMessage->setNodeNextRoadId(getNextRoadId(getCurrentRoute(),getCurrentRoadId()).c_str());//next road id
+    sendMessage->setCurrentRoadId(getCurrentRoadId().c_str());//current road id
+    sendMessage->setSenderPos(getCurrentPos(simTime()));//current pos
+    unicastNum++;
+    send(sendMessage, toDecisionMaker);
+}
+
 
 void SimpleApp::startUnicastDeparture(LAddress::L2Type macAddr,int msgState,std::string Id_CH)
 {
@@ -1558,6 +1653,14 @@ LAddress::L2Type SimpleApp::getMacAddr_CH()
     return macAddr_CH;
 }
 
+bool SimpleApp::junctionIDInRoadId(std::string roadId, std::string junctionId) {
+    if (roadId.find(junctionId) != std::string::npos) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
 bool SimpleApp::isgatewayNode() {
     return this->gatewayNode;
 }
@@ -1617,9 +1720,66 @@ void SimpleApp::startBroadcastTopologyInfo(int code) {
     std::cout<<"broadcast topology msg"<<std::endl;
 }
 
+void SimpleApp::startRouting() {
+    std::vector<Connectivity_Info>::iterator it_Connectivity_Info = this->routeTable.begin();
+    LAddress::L2Type macAddrNextHop = (*it_Connectivity_Info).macAddrGW;
+    this->routeTable.erase(it_Connectivity_Info);
+    HeterogeneousMessage *sendMessage = new HeterogeneousMessage();
+    sendMessage->setNetworkType(DSRC);
+    sendMessage->setName("unicast Test Message");
+    sendMessage->setByteLength(10);
+    TraCIScenarioManager* manager = TraCIScenarioManagerAccess().get();
+    std::map<std::string, cModule*> hosts = manager->getManagedHosts();
+    std::map<std::string, cModule*>::iterator it = hosts.begin();
+    std::advance(it, intrand(hosts.size()));
+    std::string destination("node[" +this->route_destination+ "]");
+    sendMessage->setDestinationAddress(destination.c_str());
+    sendMessage->setMsgState(getVehicleState());//message state
+    sendMessage->setSendingTime(simTime());
+    sendMessage->setRoutingStartTime(simTime().dbl());
+    sendMessage->setUsedFor(RelayRoute);
+    sendMessage->setIsBroadcast(false);//unicast
+    sendMessage->setMacAddr(macAddrNextHop);//set mac address
+    sendMessage->setSourceAddress(this->getSumoId().c_str());//source
+    sendMessage->setNodeNextRoadId(getNextRoadId(getCurrentRoute(),getCurrentRoadId()).c_str());//next road id
+    sendMessage->setCurrentRoadId(getCurrentRoadId().c_str());//current road id
+    sendMessage->setSenderPos(getCurrentPos(simTime()));//current pos
+    sendMessage->setRouteTable(this->routeTable);
+    send(sendMessage, toDecisionMaker);
+    unicastNum++;
+    std::cerr<<"==========start routing message unicast====================>"<<std::endl;
+}
+
+
+void SimpleApp::startBroadcastToDestination(HeterogeneousMessage *receiveMessage) {
+    HeterogeneousMessage *sendMessage = new HeterogeneousMessage();
+    sendMessage->setNetworkType(DSRC);
+    sendMessage->setName("DSRC Broadcast Message");
+    sendMessage->setByteLength(10);
+    TraCIScenarioManager* manager = TraCIScenarioManagerAccess().get();
+    std::map<std::string, cModule*> hosts = manager->getManagedHosts();
+    std::map<std::string, cModule*>::iterator it = hosts.begin();
+    std::advance(it, intrand(hosts.size()));
+    std::string destination("node[" + it->first + "]");
+    sendMessage->setDestinationAddress(destination.c_str());//destination
+    sendMessage->setSourceAddress(sumoId.c_str());//source
+    sendMessage->setMsgState(this->getVehicleState());//message state
+    sendMessage->setNodeNextRoadId(getNextRoadId(getCurrentRoute(),getCurrentRoadId()).c_str());//next road id
+    sendMessage->setCurrentRoadId(getCurrentRoadId().c_str());//current road id
+    sendMessage->setSenderPos(getCurrentPos(simTime()));//current pos
+    sendMessage->setSendingTime(simTime());
+    sendMessage->setIsBroadcast(true);
+    sendMessage->setUsedFor(BroadcastToDestination);
+    sendMessage->setDestinationAddress(receiveMessage->getDestinationAddress());
+    countBroadcastNum();
+    send(sendMessage, toDecisionMaker);
+    std::cout<<"+++++++++++++++++++++++++++++++++++"<<std::endl;
+}
+
 void SimpleApp::relayRoutingMsg(HeterogeneousMessage *receiveMessage) {
     this->routeTable = receiveMessage->getRouteTable();
     std::vector<Connectivity_Info>::iterator it_delete = this->routeTable.begin();
+    LAddress::L2Type macAddrNextHop = (*it_delete).macAddrGW;
     (this->routeTable).erase(it_delete);
     HeterogeneousMessage *sendMessage = new HeterogeneousMessage();
     sendMessage->setNetworkType(DSRC);
@@ -1630,18 +1790,14 @@ void SimpleApp::relayRoutingMsg(HeterogeneousMessage *receiveMessage) {
     std::map<std::string, cModule*>::iterator it = hosts.begin();
     std::advance(it, intrand(hosts.size()));
     std::string temp(receiveMessage->getSourceAddress());
-    std::string destination("node[" +CHId+ "]");
-    sendMessage->setDestinationAddress(destination.c_str());
+    sendMessage->setDestinationAddress(receiveMessage->getDestinationAddress());
     sendMessage->setMsgState(getVehicleState());//message state
     sendMessage->setSendingTime(simTime());
-    if(getVehicleState() == 3)
-    {
-        sendMessage->setCHId(receiveMessage->getSourceAddress());
-    }
+    sendMessage->setSendingTime(receiveMessage->getRoutingStartTime());
     sendMessage->setUsedFor(RelayRoute);
     sendMessage->setIsBroadcast(false);//unicast
-    sendMessage->setMacAddr(((this->routeTable).front()).macAddrGW);//set mac address
-    sendMessage->setSourceAddress(sumoId.c_str());//source
+    sendMessage->setMacAddr(macAddrNextHop);//set mac address
+    sendMessage->setSourceAddress(this->sumoId.c_str());//source
     sendMessage->setNodeNextRoadId(getNextRoadId(getCurrentRoute(),getCurrentRoadId()).c_str());//next road id
     sendMessage->setCurrentRoadId(getCurrentRoadId().c_str());//current road id
     sendMessage->setSenderPos(getCurrentPos(simTime()));//current pos
@@ -1664,6 +1820,7 @@ void SimpleApp::findRoutePath( std::vector<Connectivity_Info> onePath, double co
             onePath.push_back(it_temp->second);
             conenctivity_value += ((it_temp->second).connectivityValue);
             this->routeForSelected.insert(std::make_pair(conenctivity_value, onePath));
+            this->smallestDelayForRoute = this->smallestDelayForRoute < conenctivity_value ? this->smallestDelayForRoute : conenctivity_value;
             //erase
             onePath.pop_back();
             conenctivity_value -= ((it_temp->second).connectivityValue);
@@ -1678,12 +1835,19 @@ void SimpleApp::findRoutePath( std::vector<Connectivity_Info> onePath, double co
         while (it_temp != connectionData.end()) {// the road connected to the target intersection ID
             onePath.push_back(it_temp->second);
             conenctivity_value += ((it_temp->second).connectivityValue);
-            currentHop++;
-            findRoutePath(onePath, conenctivity_value, currentHop, it_temp->first, targetIntersectionId);
-            //erase
-            currentHop--;
-            conenctivity_value -= ((it_temp->second).connectivityValue);
-            onePath.pop_back();
+            if (junctionIDInRoadId(it_temp->first, targetIntersectionId)) {
+                this->routeForSelected.insert(std::make_pair(conenctivity_value, onePath));
+                this->smallestDelayForRoute = this->smallestDelayForRoute < conenctivity_value ? this->smallestDelayForRoute : conenctivity_value;
+                onePath.pop_back();
+                conenctivity_value -= ((it_temp->second).connectivityValue);
+            } else {
+                currentHop++;
+                findRoutePath(onePath, conenctivity_value, currentHop, it_temp->first, targetIntersectionId);
+                //erase
+                currentHop--;
+                conenctivity_value -= ((it_temp->second).connectivityValue);
+                onePath.pop_back();
+            }
             it_temp++;
         }
         it++;
@@ -1699,36 +1863,30 @@ double SimpleApp::computeDis(Coord pos1,Coord pos2)
 std::vector<std::string> SimpleApp::findTwoIntersection(Coord selfPos) {
     // find the first closest intersection
     std::vector<std::string> result;
+    std::vector<std::string> resultReturn;
     std::map<int, std::string> distanceToIntersections;
     std::map<std::string, Coord>::iterator it_map =  electricMap.begin();
     int resultFirst = 20000;
-    bool twoIntersectionSameDis = false;
     while(it_map != electricMap.end()) {
         int distance = int(computeDis(selfPos,it_map->second));
         resultFirst = resultFirst < distance ? resultFirst : distance;
         if(distanceToIntersections.count(distance) > 0) {
             result.push_back(it_map->first);
-            twoIntersectionSameDis = true;
         } else {
             distanceToIntersections.insert(std::make_pair(distance, it_map->first));
         }
         it_map++;
     }
-    //find the second;
-    result.push_back(distanceToIntersections[resultFirst]);
-    if (!twoIntersectionSameDis) {
-        distanceToIntersections.erase(resultFirst);
-        std::map<int, std::string>::iterator it_second = distanceToIntersections.begin();
-        int resultSecond = 200000;
-        while(it_second != distanceToIntersections.end()) {
-            resultSecond = resultSecond < it_second->first ? resultSecond : it_second->first;
-            it_second++;
-        }
-        result.push_back(distanceToIntersections[resultSecond]);
-    } else {
-        return result;
+    resultReturn.push_back(distanceToIntersections[resultFirst]);
+    distanceToIntersections.erase(resultFirst);
+    int resultSecond = 20000;
+    std::map<int, std::string>::iterator it_second = distanceToIntersections.begin();
+    while(it_second != distanceToIntersections.end()) {
+        resultSecond = resultSecond < it_second->first ? resultSecond : it_second->first;
+        it_second++;
     }
-    // find the second closest intersection
+    resultReturn.push_back(distanceToIntersections[resultSecond]);
+    return resultReturn;
 }
 
 
